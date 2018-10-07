@@ -1,0 +1,15 @@
+import torch
+
+class Caption_Model(nn.Module):
+    def __init__(self, dictionary_size, image_feature_dim):
+        super(Caption_Model, self).__init__()
+        self.lstm1 = #TODO
+        self.lstm2 = #TODO
+        self.attention = #TODO
+    
+    def forward(self, image_features, nb_timesteps):
+        v_mean = image_features.mean()#TODO dim=??)
+        self.initialize_inference()
+        for t in range(nb_timesteps):
+            
+
