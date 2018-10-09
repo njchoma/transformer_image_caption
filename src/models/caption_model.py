@@ -34,18 +34,18 @@ class Caption_Model(nn.Module):
                                           NB_HIDDEN_ATT)
         self.predict_word = nn.Linear(NB_HIDDEN_LSTM2, dict_size)
     
-    def forward(self, image_features, nb_timesteps):
+    def forward(self, image_features, nb_timesteps, true_words):
         nb_batch, nb_image_feats, _ = image_features.size()
         v_mean = image_features.mean(dim=2)
         h1, c1, h2, c2, current_word = self.initialize_inference()
-        y_out = utils.make_zeros((nb_batch, nb_timesteps, self.dict_size),
+        y_out = utils.make_zeros((nb_batch, nb_timesteps),
                                  cuda = image_features.is_cuda)
         for t in range(nb_timesteps):
             word_emb = self.emb_word(current_word)
             h1, c1 = self.lstm1(h1, c1, h2, v_mean, word_emb)
             v_hat = self.attention(h1, image_features)
             h2, c2 = self.lstm2(h2, c2, v_hat, h1)
-            y, current_word = self.predict_word(h2)
+            y, current_word = self.predict_word(h2, true_word[t])
             y_out[:,t] = y
 
         return y_out
@@ -105,11 +105,7 @@ class Predict_Word(nn.Module):
         super(Predict_Word, self).__init__()
         self.fc = nn.Linear(dim_language_lstm, dict_size):
         
-    def forward(self, h2):
-        y = self.fc(h2)
-        return y, self._one_hot_word(y)
-
-    def _one_hot_word(self, y):
-        #TODO
-        # beam search??
-        return word_emb
+    def forward(self, h2, true_word):
+        true_idx = (true_word==1).nonzero()
+        y = self.fc(h2)[true_idx]
+        return y, true_word
