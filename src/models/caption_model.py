@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-import utils_model
+import utils_model as utils
 
 #########################################
 #               CONSTANTS               #
