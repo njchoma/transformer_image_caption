@@ -1,3 +1,3 @@
 # TODO
 def initialize_data():
-    return None
+    return None, 100

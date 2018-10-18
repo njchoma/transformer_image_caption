@@ -7,8 +7,9 @@ import torch
 import torch.optim as optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
-from models.caption_model import Caption_Model
+import utils_experiment as utils
 from data import initialize_data
+from models.caption_model import Caption_Model
 
 #########################################
 #               CONSTANTS               #
@@ -23,42 +24,6 @@ if torch.cuda.is_available():
 else:
     device = torch.device('cpu')
 
-#####################################
-#               UTILS               #
-#####################################
-def read_args():
-    parser = argparse.ArgumentParser()
-    add_arg = parser.add_argument
-
-    add_arg('--train_dir', type=str, required=True,
-            help='Folder where training data is stored')
-    add_arg('--artifacts_dir', type=str, required=True,
-            help='Folder where all training artifacts are saved')
-    add_arg('--name', type=str, required=True,
-            help='Name of current training scheme')
-    add_arg('--run_nb', type=int, default=0,
-            help='Run number of current iteration of model')
-
-    return parser.parse_args()
-
-def initialize_logger(experiment_dir):
-    logfile = os.path.join(experiment_dir, 'log.txt')
-    logging.basicConfig(filename=logfile,format='%(message)s',level=logging.INFO)
-    logging.getLogger().addHandler(logging.StreamHandler())
-
-def save_args(args, experiment_dir, args_file):
-    args_path = os.path.join(experiment_dir, args_file)
-    with open(args_path, 'w') as f:
-        yaml.dump(args, f, default_flow_style=False)
-    logging.info("Args saved")
-    
-def load_args(experiment_dir, args_file):
-    args_path = os.path.join(experiment_dir, args_file)
-    with open(args_path, 'r') as f:
-        args = yaml.load(f)
-    logging.info("Args loaded")
-    return args
-
 #########################################
 #               TRAINING                #
 #########################################
@@ -71,16 +36,16 @@ def train(args, model, train_loader, valid_loader):
 #               MAIN                #
 #####################################
 def main():
-    args = read_args()
+    args = utils.read_args()
     args.experiment_dir = os.path.join(args.artifacts_dir,
                                        args.name,
                                        str(args.run_nb))
     os.makedirs(args.experiment_dir, exist_ok=True)
-    initialize_logger(args.experiment_dir)
+    utils.initialize_logger(args.experiment_dir)
     try:
-        load_args(args.experiment_dir, ARGS_FILE)
+        utils.load_args(args.experiment_dir, ARGS_FILE)
     except:
-        save_args(args, args.experiment_dir, ARGS_FILE)
+        utils.save_args(args, args.experiment_dir, ARGS_FILE)
 
     logging.warning("Starting {}, run {}.".format(args.name, args.run_nb))
 
