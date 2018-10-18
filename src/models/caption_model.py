@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-import utils_model as utils
+import models.utils_models as utils
 
 #########################################
 #               CONSTANTS               #
@@ -56,6 +56,7 @@ class Caption_Model(nn.Module):
 #####################################################
 class Attention_LSTM(nn.Module):
     def __init__(self, dim_word_emb, dim_lang_lstm, dim_image_feats, nb_hidden):
+        super(Attention_LSTM,self).__init__()
         self.lstm_cell = nn.LSTMCell(dim_lang_lstm+dim_image_feats+dim_word_emb,
                                      nb_hidden,
                                      bias=True)
@@ -67,6 +68,7 @@ class Attention_LSTM(nn.Module):
 
 class Language_LSTM(nn.Module):
     def __init__(self, dim_att_lstm, dim_visual_att, nb_hidden):
+        super(Language_LSTM,self).__init__()
         self.lstm_cell = nn.LSTMCell(dim_att_lstm+dim_visual_att,
                                      nb_hidden,
                                      bias=True)
@@ -79,6 +81,7 @@ class Language_LSTM(nn.Module):
 
 class Visual_Attention(nn.Module):
     def __init__(self, dim_image_feats, dim_att_lstm, nb_hidden):
+        super(Visual_Attention,self).__init__()
         self.fc_image_feats = nn.Linear(dim_image_feats, nb_hidden, bias=False)
         self.fc_att_lstm = nn.Linear(dim_att_lstm, nb_hidden, bias=False)
         self.act_tan = nn.Tanh()
@@ -103,7 +106,7 @@ class Visual_Attention(nn.Module):
 class Predict_Word(nn.Module):
     def __init__(self, dim_language_lstm, dict_size):
         super(Predict_Word, self).__init__()
-        self.fc = nn.Linear(dim_language_lstm, dict_size):
+        self.fc = nn.Linear(dim_language_lstm, dict_size)
         
     def forward(self, h2, true_word):
         true_idx = (true_word==1).nonzero()
