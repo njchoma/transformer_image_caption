@@ -1,9 +1,13 @@
 import os
+import logging
 import argparse
 
 import torch
+import torch.optim as optim
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from models.caption_model import Caption_Model
+from data import initialize_data
 
 #############################
 #           DEVICE          #
@@ -31,6 +35,18 @@ def read_args():
 
     return parser.parse_args()
 
+def initialize_logger(experiment_dir):
+    logfile = os.path.join(experiment_dir, 'log.txt')
+    logging.basicConfig(filename=logfile,format='%(message)s',level=logging.INFO)
+    logging.getLogger().addHandler(logging.StreamHandler())
+
+#########################################
+#               TRAINING                #
+#########################################
+def train(args, model, train_loader, valid_loader):
+    logging.warning("Beginning training")
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    scheduler = ReduceLROnPlateau(optimizer, 'min')
 
 #####################################
 #               MAIN                #
@@ -41,8 +57,20 @@ def main():
                                        args.name,
                                        str(args.run_nb))
     os.makedirs(args.experiment_dir, exist_ok=True)
+    initialize_logger(args.experiment_dir)
+    logging.warning("Starting {}, run {}.".format(args.name, args.run_nb))
+
+    # TODO construct train, valid dataloader
+    logging.info("Loading data...")
+    dictionary = initialize_data()
+    train_loader = None
+    valid_loader = None
+    test_loader  = None
+    logging.info("Done.")
 
     model = Caption_Model(dict_size=10, image_feature_dim=100)
+
+    train(args, model, train_loader, valid_loader)
 
 
 if __name__ == "__main__":
