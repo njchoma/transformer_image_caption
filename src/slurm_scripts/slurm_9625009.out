@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "/home/ovd208/repos/transformer_image_caption/src//data_helpers/test_dataloader.py", line 1, in <module>
+    from data_loader import get_loader
+  File "/home/ovd208/repos/transformer_image_caption/src/data_helpers/data_loader.py", line 120
+    vocab=vocab, data_type)
+SyntaxError: non-keyword arg after keyword arg

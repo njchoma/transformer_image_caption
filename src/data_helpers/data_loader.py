@@ -32,7 +32,7 @@ import cPickle
 
 class CocoDataset(data.Dataset):
     """COCO Custom Dataset compatible with torch.utils.data.DataLoader."""
-    def __init__(self, data_root, vocab):
+    def __init__(self, data_root, vocab, data_type):
         """Set the path for images, captions and vocabulary wrapper.
         
         Args:
@@ -40,14 +40,14 @@ class CocoDataset(data.Dataset):
             vocab: vocabulary wrapper.
             transform: image transformer.
         """
-        
-        self.imgid2idx = cPickle.load(open(os.path.join(data_root, "train36_imgid2idx.pkl")))
-        train_file = data_root + '/' + "train36.hdf5"      
-        train_h5 = h5py.File(train_file,'r')       
-        self.train_features = np.array(train_h5.get('image_features'))
+        self.data_type = data_type
+        self.imgid2idx = cPickle.load(open(os.path.join(data_root, data_type + "36_imgid2idx.pkl")))
+        file_name = data_root + '/' + data_type + "36.hdf5"      
+        data_h5 = h5py.File(file_name,'r')       
+        self.train_features = np.array(data_h5.get('image_features'))
         
         #annotation loading
-        annotation_path = os.path.join(data_root, "captions", "annotations", "captions_train2014.json")
+        annotation_path = os.path.join(data_root, "captions", "annotations", "captions_" + data_type + "2014.json")
 
         self.coco = COCO(annotation_path)
         ids = list(self.coco.anns.keys())
@@ -113,11 +113,11 @@ def collate_fn(data):
         targets[i, :end] = cap[:end]        
     return features, targets, lengths
 
-def get_loader(data_root, vocab, batch_size, shuffle, num_workers):
+def get_loader(data_root, vocab, batch_size, data_type, shuffle, num_workers):
     """Returns torch.utils.data.DataLoader for custom coco dataset."""
     # COCO caption dataset
     coco = CocoDataset(data_root=data_root,
-                       vocab=vocab)
+                       vocab=vocab, data_type = data_type)
     
     # Data loader for COCO dataset
     # This will return (features, captions, lengths) for each iteration.
