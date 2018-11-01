@@ -1,7 +1,8 @@
 # Custom
-slurm_out/*
+*slurm_*
 run_*
 *~
+models*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

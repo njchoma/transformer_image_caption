@@ -29,10 +29,23 @@ else:
 #########################################
 #               TRAINING                #
 #########################################
+def train_one_epoch(args, model, train_loader, optimizer):
+    nb_batch = len(train_loader)
+    nb_train = nb_batch * args.batch_size
+    for i, (features, captions, lengths) in enumerate(train_loader):
+        print(i)
+        out = model(features, captions)
+        print(out)
+        exit()
+
 def train(args, model, train_loader, valid_loader):
     logging.warning("Beginning training")
     optimizer = optim.Adam(model.parameters(), lr=0.001)
     scheduler = ReduceLROnPlateau(optimizer, 'min')
+    while args.current_epoch < args.max_nb_epochs:
+        args.current_epoch += 1
+        logging.info("\nEpoch {}".format(args.current_epoch))
+        train_stats = train_one_epoch(args, model, train_loader, optimizer)
 
 #####################################
 #               MAIN                #
@@ -46,14 +59,14 @@ def main():
                                        str(args.run_nb))
     os.makedirs(args.experiment_dir, exist_ok=True)
     utils.initialize_logger(args.experiment_dir)
+    logging.warning("Starting {}, run {}.".format(args.name, args.run_nb))
     try:
-        utils.load_args(args.experiment_dir, ARGS_FILE)
+        args = utils.load_args(args.experiment_dir, ARGS_FILE)
     except:
+        args.current_epoch = 0
         utils.save_args(args, args.experiment_dir, ARGS_FILE)
 
-    logging.warning("Starting {}, run {}.".format(args.name, args.run_nb))
 
-    # TODO construct train, valid dataloader
     logging.info("Loading data...")
     with open(os.path.join(args.root_dir, 'vocab.pkl'), 'rb') as f:
         vocab = pickle.load(f)
@@ -62,7 +75,8 @@ def main():
                               batch_size=args.batch_size,
                               data_type='train',
                               shuffle=True,
-                              num_workers=0)
+                              num_workers=0,
+                              debug=args.debug)
     valid_loader = None
     test_loader  = None
     logging.info("Done.")

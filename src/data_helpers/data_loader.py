@@ -32,7 +32,7 @@ import _pickle as cPickle
 
 class CocoDataset(data.Dataset):
     """COCO Custom Dataset compatible with torch.utils.data.DataLoader."""
-    def __init__(self, data_root, vocab, data_type):
+    def __init__(self, data_root, vocab, data_type, debug=False):
         """Set the path for images, captions and vocabulary wrapper.
         
         Args:
@@ -42,7 +42,10 @@ class CocoDataset(data.Dataset):
         """
         self.data_type = data_type
         self.imgid2idx = cPickle.load(open(os.path.join(data_root, data_type + "36_imgid2idx.pkl"), 'rb'))
-        file_name = data_root + '/' + data_type + "36.hdf5"      
+        if debug:
+            file_name = data_root + '/' + data_type + "36_mini.hdf5"
+        else:
+            file_name = data_root + '/' + data_type + "36.hdf5"      
         data_h5 = h5py.File(file_name,'r')       
         self.train_features = np.array(data_h5.get('image_features'))
         
@@ -113,11 +116,11 @@ def collate_fn(data):
         targets[i, :end] = cap[:end]        
     return features, targets, lengths
 
-def get_loader(data_root, vocab, batch_size, data_type, shuffle, num_workers):
+def get_loader(data_root, vocab, batch_size, data_type, shuffle, num_workers, debug=False):
     """Returns torch.utils.data.DataLoader for custom coco dataset."""
     # COCO caption dataset
     coco = CocoDataset(data_root=data_root,
-                       vocab=vocab, data_type = data_type)
+                       vocab=vocab, data_type = data_type, debug=debug)
     
     # Data loader for COCO dataset
     # This will return (features, captions, lengths) for each iteration.
