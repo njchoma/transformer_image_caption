@@ -44,15 +44,20 @@ class CocoDataset(data.Dataset):
         self.imgid2idx = cPickle.load(open(os.path.join(data_root, data_type + "36_imgid2idx.pkl"), 'rb'))
         if debug:
             file_name = data_root + '/' + data_type + "36_mini.hdf5"
+            with open(os.path.join(data_root,"mini_anno.pkl"), 'rb') as f:
+                self.coco = pickle.load(f)
         else:
             file_name = data_root + '/' + data_type + "36.hdf5"      
+            annotation_path = os.path.join(data_root,
+                                           "captions",
+                                           "annotations",
+                                           "captions_"+data_type+"2014.json")
+            self.coco = COCO(annotation_path)
+
+
         data_h5 = h5py.File(file_name,'r')       
         self.train_features = np.array(data_h5.get('image_features'))
         
-        #annotation loading
-        annotation_path = os.path.join(data_root, "captions", "annotations", "captions_" + data_type + "2014.json")
-
-        self.coco = COCO(annotation_path)
         ids = list(self.coco.anns.keys())
 
         self.data_root = data_root

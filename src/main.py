@@ -32,6 +32,7 @@ else:
 def train_one_epoch(args, model, train_loader, optimizer):
     nb_batch = len(train_loader)
     nb_train = nb_batch * args.batch_size
+    logging.info("Training {} batches, {} samples.".format(nb_batch, nb_train))
     for i, (features, captions, lengths) in enumerate(train_loader):
         print(i)
         out = model(features, captions)
