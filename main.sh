@@ -2,12 +2,12 @@
 #SBATCH --
 #SBATCH
 
-TRAIN_DIR="$SCRATCH/data/image_captioning"
+ROOT_DIR="/scratch/ovd208/COCO_features/data"
 ARTIFACTS_DIR="$SCRATCH/artifacts/image_captioning"
 NAME='test_run'
 
 
-PYARGS="--train_dir $TRAIN_DIR --artifacts_dir $ARTIFACTS_DIR --name $NAME"
+PYARGS="--root_dir $ROOT_DIR --artifacts_dir $ARTIFACTS_DIR --name $NAME"
 
-source ~/pyenv/openpose/bin/activate
+source $SCRATCH/pyenv/img_caption/bin/activate
 python src/main.py $PYARGS

@@ -10,14 +10,16 @@ def read_args():
     parser = argparse.ArgumentParser()
     add_arg = parser.add_argument
 
-    add_arg('--train_dir', type=str, required=True,
-            help='Folder where training data is stored')
+    add_arg('--root_dir', type=str, required=True,
+            help='Folder where train, val, test data is stored')
     add_arg('--artifacts_dir', type=str, required=True,
             help='Folder where all training artifacts are saved')
     add_arg('--name', type=str, required=True,
             help='Name of current training scheme')
     add_arg('--run_nb', type=int, default=0,
             help='Run number of current iteration of model')
+    add_arg('--batch_size', type=int, default=1,
+            help='Minibatch size')
 
     return parser.parse_args()
 

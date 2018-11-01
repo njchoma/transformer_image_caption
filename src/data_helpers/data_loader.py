@@ -23,12 +23,12 @@ import pickle
 import numpy as np
 import nltk
 from PIL import Image
-from vocab import Vocabulary
+from data_helpers.vocab import Vocabulary
 from pycocotools.coco import COCO
 
 import h5py
 import argparse
-import cPickle
+import _pickle as cPickle
 
 class CocoDataset(data.Dataset):
     """COCO Custom Dataset compatible with torch.utils.data.DataLoader."""
@@ -41,7 +41,7 @@ class CocoDataset(data.Dataset):
             transform: image transformer.
         """
         self.data_type = data_type
-        self.imgid2idx = cPickle.load(open(os.path.join(data_root, data_type + "36_imgid2idx.pkl")))
+        self.imgid2idx = cPickle.load(open(os.path.join(data_root, data_type + "36_imgid2idx.pkl"), 'rb'))
         file_name = data_root + '/' + data_type + "36.hdf5"      
         data_h5 = h5py.File(file_name,'r')       
         self.train_features = np.array(data_h5.get('image_features'))
