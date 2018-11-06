@@ -23,12 +23,12 @@ import pickle
 import numpy as np
 import nltk
 from PIL import Image
-from data_helpers.vocab import Vocabulary
+from vocab import Vocabulary
 from pycocotools.coco import COCO
 
 import h5py
 import argparse
-import _pickle as cPickle
+import cPickle
 
 class CocoDataset(data.Dataset):
     """COCO Custom Dataset compatible with torch.utils.data.DataLoader."""
@@ -80,15 +80,23 @@ class CocoDataset(data.Dataset):
         #print('converting captions to word ids')
         tokens = nltk.tokenize.word_tokenize(str(caption).lower())
         caption = []
+        vocab_len = len(vocab)
         caption.append(vocab('<start>'))
         caption.extend([vocab(token) for token in tokens])
         caption.append(vocab('<end>'))
+        #print(len(caption))
         target = torch.Tensor(caption)
         return features, target
 
     def __len__(self):
         return len(self.ids)
 
+"""
+def indexto1hot(vocab_len, index):
+    one_hot = np.zeros([vocab_len])
+    one_hot[index] = 1
+    return one_hot
+"""
 
 def collate_fn(data):
     """Creates mini-batch tensors from the list of tuples (image, caption).
@@ -115,6 +123,7 @@ def collate_fn(data):
 
     # Merge captions (from tuple of 1D tensor to 2D tensor).
     lengths = [len(cap) for cap in captions]
+
     targets = torch.zeros(len(captions), max(lengths)).long()
     for i, cap in enumerate(captions):
         end = lengths[i]

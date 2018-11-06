@@ -19,5 +19,4 @@ module purge
 module load anaconda3/5.3.0
 source activate imageCaptioning
 
-
-$HOME/.conda/envs/imageCaptioning/bin/python $SRCDIR/data_helpers/test_dataloader.py --root_dir $SCRATCH/COCO_features/data --batch_size 2 --num_workers 1 --data_type train
+$HOME/.conda/envs/imageCaptioning/bin/python $SRCDIR/data_helpers/test_dataloader.py --root_dir /scratch/ovd208/COCO_features/data --batch_size 2 --data_type train

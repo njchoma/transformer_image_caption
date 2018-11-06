@@ -9,7 +9,7 @@ def main(args):
     with open(os.path.join(args.root_dir, 'vocab.pkl'), 'rb') as f:
         vocab = pickle.load(f)
     data_type = args.data_type
-    data_loader = get_loader(args.root_dir, vocab, args.batch_size, data_type, shuffle=True, num_workers = args.num_workers)
+    data_loader = get_loader(args.root_dir, vocab, args.batch_size, data_type, shuffle=True, num_workers = args.num_workers, debug=False)
 
     print('Iterating the dataset')
     print("Length of data loader: " + str(len(data_loader)))
