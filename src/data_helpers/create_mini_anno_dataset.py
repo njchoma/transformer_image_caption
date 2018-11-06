@@ -1,6 +1,7 @@
 from pycocotools.coco import COCO
 import os
 import pickle
+import cPickle
 #from easydict import EasyDict as edict
 
 data_root = '/scratch/ovd208/COCO_features/data'
@@ -14,11 +15,13 @@ ids = list(coco.anns.keys())
 #mini_dict = edict()
 mini_captions = {}
 
+imgid2idx = cPickle.load(open(os.path.join(data_root, data_type + "36_imgid2idx.pkl"), 'rb'))
+
 for i in ids:
     caption = coco.anns[i]['caption']
     image_id = coco.anns[i]['image_id']
 
-    if image_id < mini_data_size:
+    if imgid2idx[image_id] < mini_data_size:
         mini_captions[i] = {'caption': caption, 'image_id': image_id}
     
 #mini_dict.anns1 = mini_captions

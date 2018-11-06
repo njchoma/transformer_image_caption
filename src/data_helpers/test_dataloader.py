@@ -9,7 +9,7 @@ def main(args):
     with open(os.path.join(args.root_dir, 'vocab.pkl'), 'rb') as f:
         vocab = pickle.load(f)
     data_type = args.data_type
-    data_loader = get_loader(args.root_dir, vocab, args.batch_size, data_type, shuffle=True, num_workers = args.num_workers, debug=False)
+    data_loader = get_loader(args.root_dir, vocab, args.batch_size, data_type, shuffle=True, num_workers = args.num_workers, debug=args.debug)
 
     print('Iterating the dataset')
     print("Length of data loader: " + str(len(data_loader)))
@@ -22,8 +22,8 @@ def main(args):
         print("Lengths: ")
         print(len(lengths))
         #time.sleep(10)
-        print(captions[0])
-        print(captions[1])
+        #print(captions[0])
+        #print(captions[1])
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -31,6 +31,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument('--num_workers', type=int, default=2)
     parser.add_argument('--data_type', type=str, default='train')
+    parser.add_argument('--debug', type=bool, default='False')
     args = parser.parse_args()
     print(args)
     main(args)

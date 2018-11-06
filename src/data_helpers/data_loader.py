@@ -42,10 +42,14 @@ class CocoDataset(data.Dataset):
         """
         self.data_type = data_type
         self.imgid2idx = cPickle.load(open(os.path.join(data_root, data_type + "36_imgid2idx.pkl"), 'rb'))
+        ids = None
+        self.debug = debug
         if debug:
             file_name = data_root + '/' + data_type + "36_mini.hdf5"
             with open(os.path.join(data_root,"mini_anno.pkl"), 'rb') as f:
-                self.coco = pickle.load(f)
+                self.mini_coco = pickle.load(f)
+            
+            ids = list(self.mini_coco.keys())
         else:
             file_name = data_root + '/' + data_type + "36.hdf5"      
             annotation_path = os.path.join(data_root,
@@ -54,24 +58,33 @@ class CocoDataset(data.Dataset):
                                            "captions_"+data_type+"2014.json")
             self.coco = COCO(annotation_path)
 
+        
+            ids = list(self.coco.anns.keys())
 
         data_h5 = h5py.File(file_name,'r')       
         self.train_features = np.array(data_h5.get('image_features'))
         
-        ids = list(self.coco.anns.keys())
-
         self.data_root = data_root
-        self.ids = list(self.coco.anns.keys())
+        self.ids = list(ids)
         self.vocab = vocab
 
     def __getitem__(self, index):
         """Returns one data pair (image and caption)."""
         #print('Inside getitem, Retrieving for index: ' + str(index))
-        coco = self.coco
+        coco = None
         vocab = self.vocab
         ann_id = self.ids[index]
-        caption = coco.anns[ann_id]['caption']
-        img_id = coco.anns[ann_id]['image_id']
+        
+        caption = None
+        img_id = None
+        if self.debug:
+            coco = self.mini_coco
+            caption = coco[ann_id]['caption']
+            img_id = coco[ann_id]['image_id']
+        else:
+            coco = self.coco
+            caption = coco.anns[ann_id]['caption']
+            img_id = coco.anns[ann_id]['image_id']
         #path = coco.loadImgs(img_id)[0]['file_name']
         index = self.imgid2idx[img_id]
         features = self.train_features[index]
@@ -81,9 +94,9 @@ class CocoDataset(data.Dataset):
         tokens = nltk.tokenize.word_tokenize(str(caption).lower())
         caption = []
         vocab_len = len(vocab)
-        caption.append(vocab('<start>'))
-        caption.extend([vocab(token) for token in tokens])
-        caption.append(vocab('<end>'))
+        caption.append(indexto1hot(vocab_len, vocab('<start>')))
+        caption.extend([indexto1hot(vocab_len, vocab(token)) for token in tokens])
+        caption.append(indexto1hot(vocab_len, vocab('<end>')))
         #print(len(caption))
         target = torch.Tensor(caption)
         return features, target
@@ -91,12 +104,10 @@ class CocoDataset(data.Dataset):
     def __len__(self):
         return len(self.ids)
 
-"""
 def indexto1hot(vocab_len, index):
     one_hot = np.zeros([vocab_len])
     one_hot[index] = 1
     return one_hot
-"""
 
 def collate_fn(data):
     """Creates mini-batch tensors from the list of tuples (image, caption).
@@ -112,7 +123,7 @@ def collate_fn(data):
         targets: torch tensor of shape (batch_size, padded_length).
         lengths: list; valid length for each padded caption.
     """
-    print("Length of list: " + str(len(data)))
+    #print("Length of list: " + str(len(data)))
 
     # Sort a data list by caption length (descending order).
     data.sort(key=lambda x: len(x[1]), reverse=True)
@@ -124,7 +135,12 @@ def collate_fn(data):
     # Merge captions (from tuple of 1D tensor to 2D tensor).
     lengths = [len(cap) for cap in captions]
 
-    targets = torch.zeros(len(captions), max(lengths)).long()
+    vocab_len = len(captions[0][0])
+    #print("Vocab len: " + str(vocab_len) + "\n")
+    #print("Type: " + type(captions[0]))
+    #print("\n")
+
+    targets = torch.zeros(len(captions), max(lengths), vocab_len).long()
     for i, cap in enumerate(captions):
         end = lengths[i]
         targets[i, :end] = cap[:end]        
