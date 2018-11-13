@@ -35,8 +35,9 @@ def train_one_epoch(args, model, train_loader, optimizer):
     logging.info("Training {} batches, {} samples.".format(nb_batch, nb_train))
     for i, (features, captions, lengths) in enumerate(train_loader):
         print(i)
-        out = model(features, captions)
+        out = model(features, len(captions[0]), captions)
         print(out)
+        #write loss and backprop
         exit()
 
 def train(args, model, train_loader, valid_loader):
@@ -58,7 +59,8 @@ def main():
     args.experiment_dir = os.path.join(args.artifacts_dir,
                                        args.name,
                                        str(args.run_nb))
-    os.makedirs(args.experiment_dir, exist_ok=True)
+    if os.path.exists(args.experiment_dir)==False:
+        os.makedirs(args.experiment_dir)
     utils.initialize_logger(args.experiment_dir)
     logging.warning("Starting {}, run {}.".format(args.name, args.run_nb))
     try:
@@ -83,10 +85,9 @@ def main():
     logging.info("Done.")
 
     model = Caption_Model(dict_size=len(vocab),
-                          image_feature_dim=feature_dim)
+                          image_feature_dim=feature_dim, vocab=vocab)
 
     train(args, model, train_loader, valid_loader)
-
 
 if __name__ == "__main__":
     main()

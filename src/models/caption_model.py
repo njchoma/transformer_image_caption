@@ -1,7 +1,13 @@
 import torch
 import torch.nn as nn
 
+#import sys
+#sys.path.append("..")
+from data_helpers import vocab
+from data_helpers import data_loader
+#from vocab import Vocabulary
 import models.utils_models as utils
+
 
 #########################################
 #               CONSTANTS               #
@@ -16,7 +22,7 @@ NB_HIDDEN_ATT   = 512
 #               MAIN MODEL              #
 #########################################
 class Caption_Model(nn.Module):
-    def __init__(self, dict_size, image_feature_dim):
+    def __init__(self, dict_size, image_feature_dim, vocab):
         super(Caption_Model, self).__init__()
         self.dict_size = dict_size
         self.image_feature_dim = image_feature_dim
@@ -33,15 +39,16 @@ class Caption_Model(nn.Module):
                                           NB_HIDDEN_LSTM1,
                                           NB_HIDDEN_ATT)
         self.predict_word = nn.Linear(NB_HIDDEN_LSTM2, dict_size)
+        self.vocab = vocab
     
     def forward(self, image_features, nb_timesteps, true_words):
         nb_batch, nb_image_feats, _ = image_features.size()
         v_mean = image_features.mean(dim=2)
-        h1, c1, h2, c2, current_word = self.initialize_inference()
+        h1, c1, h2, c2, current_word = self.initialize_inference(self.vocab)
         y_out = utils.make_zeros((nb_batch, nb_timesteps),
                                  cuda = image_features.is_cuda)
         for t in range(nb_timesteps):
-            word_emb = self.emb_word(current_word)
+            word_emb = self.embed_word(current_word)
             h1, c1 = self.lstm1(h1, c1, h2, v_mean, word_emb)
             v_hat = self.attention(h1, image_features)
             h2, c2 = self.lstm2(h2, c2, v_hat, h1)
@@ -49,6 +56,11 @@ class Caption_Model(nn.Module):
             y_out[:,t] = y
 
         return y_out
+
+    def initialize_inference(self, vocab):
+        start_word = data_loader.indexto1hot(len(vocab), vocab('<start>'))
+        return torch.DoubleTensor(NB_HIDDEN_LSTM1) , torch.DoubleTensor(NB_HIDDEN_LSTM1), torch.DoubleTensor(NB_HIDDEN_LSTM2), torch.DoubleTensor(NB_HIDDEN_LSTM2), start_word
+
 
 
 #####################################################
