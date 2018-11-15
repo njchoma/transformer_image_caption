@@ -43,8 +43,9 @@ class Caption_Model(nn.Module):
     
     def forward(self, image_features, nb_timesteps, true_words):
         nb_batch, nb_image_feats, _ = image_features.size()
-        v_mean = image_features.mean(dim=2)
-        h1, c1, h2, c2, current_word = self.initialize_inference(self.vocab)
+        v_mean = image_features.mean(dim=1)
+        #print(v_mean.shape)
+        h1, c1, h2, c2, current_word = self.initialize_inference(self.vocab, nb_batch)
         y_out = utils.make_zeros((nb_batch, nb_timesteps),
                                  cuda = image_features.is_cuda)
         for t in range(nb_timesteps):
@@ -57,9 +58,17 @@ class Caption_Model(nn.Module):
 
         return y_out
 
-    def initialize_inference(self, vocab):
-        start_word = data_loader.indexto1hot(len(vocab), vocab('<start>'))
-        return torch.DoubleTensor(NB_HIDDEN_LSTM1) , torch.DoubleTensor(NB_HIDDEN_LSTM1), torch.DoubleTensor(NB_HIDDEN_LSTM2), torch.DoubleTensor(NB_HIDDEN_LSTM2), start_word
+    def initialize_inference(self, vocab, nb_batch):
+        start_word = torch.from_numpy(data_loader.indexto1hot(len(vocab), vocab('<start>'))).float()
+        start_word.unsqueeze_(0)
+        print(start_word.shape)
+        copy = start_word.clone()
+        for i in range(nb_batch-1):
+            copy = copy.clone()
+            start_word = torch.cat((start_word,copy),0)
+        print(start_word.shape)    
+
+        return torch.FloatTensor(nb_batch, NB_HIDDEN_LSTM1) , torch.FloatTensor(nb_batch,NB_HIDDEN_LSTM1), torch.FloatTensor(nb_batch,NB_HIDDEN_LSTM2), torch.FloatTensor(nb_batch,NB_HIDDEN_LSTM2), start_word
 
 
 
@@ -74,8 +83,11 @@ class Attention_LSTM(nn.Module):
                                      bias=True)
         
     def forward(self, h1, c1, h2, v_mean, word_emb):
+        #print(h2.shape)
+        #print(v_mean.shape)
+        #print(word_emb.shape)
         input_feats = torch.cat((h2, v_mean, word_emb),dim=1)
-        h_out, c_out = self.lstm_cell(input_feats, h1, c1)
+        h_out, c_out = self.lstm_cell(input_feats, (h1, c1))
         return h_out, c_out
 
 class Language_LSTM(nn.Module):
@@ -87,7 +99,7 @@ class Language_LSTM(nn.Module):
         
     def forward(self, h2, c2, h1, v_hat):
         input_feats = torch.cat((h1, v_hat, word_emb),dim=1)
-        h_out, c_out = self.lstm_cell(input_feats, h2, c2)
+        h_out, c_out = self.lstm_cell(input_feats, (h2, c2))
         return h_out, c_out
 
 
