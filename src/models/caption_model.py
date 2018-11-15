@@ -51,7 +51,7 @@ class Caption_Model(nn.Module):
         for t in range(nb_timesteps):
             word_emb = self.embed_word(current_word)
             h1, c1 = self.lstm1(h1, c1, h2, v_mean, word_emb)
-            v_hat = self.attention(h1, image_features)
+            v_hat = self.attention(image_features,h1)
             h2, c2 = self.lstm2(h2, c2, v_hat, h1)
             y, current_word = self.predict_word(h2, true_word[t])
             y_out[:,t] = y
@@ -114,14 +114,13 @@ class Visual_Attention(nn.Module):
 
     def forward(self, image_feats, h1):
         nb_batch, nb_feats, feat_dim = image_feats.size()
-
         att_lstm_emb = self.fc_att_lstm(h1).unsqueeze(1)
         image_feats_emb = self.fc_image_feats(image_feats)
         all_feats_emb = image_feats_emb + att_lstm_emb.repeat(1,nb_feats,1)
 
         activate_feats = self.act_tan(all_feats_emb)
         unnorm_attention = self.fc_att(activate_feats)
-        normed_attention = self.softmax(unnorm_feats).unsqueeze(2)
+        normed_attention = self.softmax(unnorm_attention).unsqueeze(2)
 
         weighted_feats = normed_attention.repeat(1,1,nb_feats) * image_feats
         attended_image_feats = weighted_feats.sum(dim=2)
