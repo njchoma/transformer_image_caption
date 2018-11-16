@@ -35,7 +35,7 @@ def train_one_epoch(args, model, train_loader, optimizer):
     logging.info("Training {} batches, {} samples.".format(nb_batch, nb_train))
     for i, (features, captions, lengths) in enumerate(train_loader):
         print(i)
-        out = model(features, len(captions[0]), captions)
+        out = model(features, len(captions[0]))
         print(out)
         #write loss and backprop
         exit()

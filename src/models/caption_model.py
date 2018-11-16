@@ -33,7 +33,7 @@ class Caption_Model(nn.Module):
                                     image_feature_dim,
                                     NB_HIDDEN_LSTM1)
         self.lstm2 = Language_LSTM(NB_HIDDEN_LSTM1,
-                                   NB_HIDDEN_ATT,
+                                   image_feature_dim,
                                    NB_HIDDEN_LSTM2)
         self.attention = Visual_Attention(image_feature_dim,
                                           NB_HIDDEN_LSTM1,
@@ -41,20 +41,22 @@ class Caption_Model(nn.Module):
         self.predict_word = nn.Linear(NB_HIDDEN_LSTM2, dict_size)
         self.vocab = vocab
     
-    def forward(self, image_features, nb_timesteps, true_words):
+    def forward(self, image_features, nb_timesteps):
         nb_batch, nb_image_feats, _ = image_features.size()
         v_mean = image_features.mean(dim=1)
         #print(v_mean.shape)
         h1, c1, h2, c2, current_word = self.initialize_inference(self.vocab, nb_batch)
-        y_out = utils.make_zeros((nb_batch, nb_timesteps),
+        y_out = utils.make_zeros((nb_batch, nb_timesteps, self.dict_size),
                                  cuda = image_features.is_cuda)
         for t in range(nb_timesteps):
             word_emb = self.embed_word(current_word)
             h1, c1 = self.lstm1(h1, c1, h2, v_mean, word_emb)
             v_hat = self.attention(image_features,h1)
-            h2, c2 = self.lstm2(h2, c2, v_hat, h1)
-            y, current_word = self.predict_word(h2, true_word[t])
-            y_out[:,t] = y
+            h2, c2 = self.lstm2(h2, c2, h1, v_hat)
+            print(h2.shape)
+            y = self.predict_word(h2)
+            print(y.shape)
+            y_out[:,t,:] = y
 
         return y_out
 
@@ -98,7 +100,9 @@ class Language_LSTM(nn.Module):
                                      bias=True)
         
     def forward(self, h2, c2, h1, v_hat):
-        input_feats = torch.cat((h1, v_hat, word_emb),dim=1)
+        #print(h1.shape)
+        #print(v_hat.shape)
+        input_feats = torch.cat((h1, v_hat),dim=1)
         h_out, c_out = self.lstm_cell(input_feats, (h2, c2))
         return h_out, c_out
 
@@ -120,10 +124,16 @@ class Visual_Attention(nn.Module):
 
         activate_feats = self.act_tan(all_feats_emb)
         unnorm_attention = self.fc_att(activate_feats)
-        normed_attention = self.softmax(unnorm_attention).unsqueeze(2)
+        normed_attention = self.softmax(unnorm_attention)
 
-        weighted_feats = normed_attention.repeat(1,1,nb_feats) * image_feats
-        attended_image_feats = weighted_feats.sum(dim=2)
+        #print(normed_attention.shape)
+        #print(nb_feats)
+        #print(image_feats.shape)
+        #weighted_feats = normed_attention.repeat(1,1,nb_feats) * image_feats
+        weighted_feats = normed_attention * image_feats
+        #print(weighted_feats.shape)
+        attended_image_feats = weighted_feats.sum(dim=1)
+        #print(attended_image_feats.shape)
         return attended_image_feats
 
 class Predict_Word(nn.Module):
