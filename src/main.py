@@ -29,25 +29,56 @@ else:
 #########################################
 #               TRAINING                #
 #########################################
-def train_one_epoch(args, model, train_loader, optimizer):
+def train_one_epoch(args, model, train_loader, optimizer, len_vocab):
     nb_batch = len(train_loader)
     nb_train = nb_batch * args.batch_size
     logging.info("Training {} batches, {} samples.".format(nb_batch, nb_train))
+    
+    loss = torch.nn.CrossEntropyLoss()
+    
+    epoch_loss = 0
     for i, (features, captions, lengths) in enumerate(train_loader):
-        print(i)
-        out = model(features, len(captions[0]))
-        print(out)
-        #write loss and backprop
-        exit()
+        #print(i)
+        len_captions = len(captions[0])
+        if torch.cuda.is_available():
+            features, captions = features.cuda(), captions.cuda()
 
-def train(args, model, train_loader, valid_loader):
+        out = model(features, len_captions)
+        #print(out)
+        n_ex, vocab_len = out.view(-1, len_vocab).shape
+        #print(n_ex)
+        #print(vocab_len)
+        captions = captions[:,1:]
+        #print(captions.contiguous().view(1,n_ex).squeeze().shape)
+        #nonzeros = torch.nonzero(captions[:,1:,:])        
+        #print(nonzeros.shape)
+        #caption_indices = captions[:,1:,:] == 1
+        
+        batch_loss = loss(out.view(-1,len_vocab),captions.contiguous().view(1, n_ex).squeeze())
+        #print(str(batch_loss.item()) + "\n")
+        epoch_loss+=batch_loss.item()
+
+        optimizer.zero_grad()
+        batch_loss.backward()
+        optimizer.step()        
+
+    epoch_loss = epoch_loss/nb_train
+    print(epoch_loss)
+
+def train(args, model, train_loader, valid_loader, len_vocab):
     logging.warning("Beginning training")
     optimizer = optim.Adam(model.parameters(), lr=0.001)
     scheduler = ReduceLROnPlateau(optimizer, 'min')
+
+    if torch.cuda.is_available():
+        model = model.cuda()
+
+
+    print("No of epochs: " + str(args.max_nb_epochs))
     while args.current_epoch < args.max_nb_epochs:
         args.current_epoch += 1
         logging.info("\nEpoch {}".format(args.current_epoch))
-        train_stats = train_one_epoch(args, model, train_loader, optimizer)
+        train_stats = train_one_epoch(args, model, train_loader, optimizer, len_vocab)
 
 #####################################
 #               MAIN                #
@@ -87,7 +118,7 @@ def main():
     model = Caption_Model(dict_size=len(vocab),
                           image_feature_dim=feature_dim, vocab=vocab)
 
-    train(args, model, train_loader, valid_loader)
+    train(args, model, train_loader, valid_loader, len(vocab))
 
 if __name__ == "__main__":
     main()

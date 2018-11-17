@@ -45,32 +45,35 @@ class Caption_Model(nn.Module):
         nb_batch, nb_image_feats, _ = image_features.size()
         v_mean = image_features.mean(dim=1)
         #print(v_mean.shape)
-        h1, c1, h2, c2, current_word = self.initialize_inference(self.vocab, nb_batch)
-        y_out = utils.make_zeros((nb_batch, nb_timesteps, self.dict_size),
+        h1, c1, h2, c2, current_word = self.initialize_inference(self.vocab, nb_batch, cuda = image_features.is_cuda)
+        y_out = utils.make_zeros((nb_batch, nb_timesteps-1, self.dict_size),
                                  cuda = image_features.is_cuda)
-        for t in range(nb_timesteps):
+        for t in range(nb_timesteps-1):
             word_emb = self.embed_word(current_word)
             h1, c1 = self.lstm1(h1, c1, h2, v_mean, word_emb)
             v_hat = self.attention(image_features,h1)
             h2, c2 = self.lstm2(h2, c2, h1, v_hat)
-            print(h2.shape)
+            #print(h2.shape)
             y = self.predict_word(h2)
-            print(y.shape)
+            #print(y.shape)
             y_out[:,t,:] = y
 
         return y_out
 
-    def initialize_inference(self, vocab, nb_batch):
+    def initialize_inference(self, vocab, nb_batch, cuda):
         start_word = torch.from_numpy(data_loader.indexto1hot(len(vocab), vocab('<start>'))).float()
         start_word.unsqueeze_(0)
-        print(start_word.shape)
+        #print(start_word.shape)
         copy = start_word.clone()
         for i in range(nb_batch-1):
             copy = copy.clone()
             start_word = torch.cat((start_word,copy),0)
-        print(start_word.shape)    
+        #print(start_word.shape)    
 
-        return torch.FloatTensor(nb_batch, NB_HIDDEN_LSTM1) , torch.FloatTensor(nb_batch,NB_HIDDEN_LSTM1), torch.FloatTensor(nb_batch,NB_HIDDEN_LSTM2), torch.FloatTensor(nb_batch,NB_HIDDEN_LSTM2), start_word
+        if cuda:
+            return torch.cuda.FloatTensor(nb_batch, NB_HIDDEN_LSTM1) , torch.cuda.FloatTensor(nb_batch,NB_HIDDEN_LSTM1), torch.cuda.FloatTensor(nb_batch,NB_HIDDEN_LSTM2), torch.cuda.FloatTensor(nb_batch,NB_HIDDEN_LSTM2), start_word.cuda()
+        else:
+            return torch.FloatTensor(nb_batch, NB_HIDDEN_LSTM1) , torch.FloatTensor(nb_batch,NB_HIDDEN_LSTM1), torch.FloatTensor(nb_batch,NB_HIDDEN_LSTM2), torch.FloatTensor(nb_batch,NB_HIDDEN_LSTM2), start_word
 
 
 
