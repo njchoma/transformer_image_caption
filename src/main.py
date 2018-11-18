@@ -3,6 +3,10 @@ import yaml
 import logging
 import pickle
 import argparse
+import matplotlib
+import time
+matplotlib.use('agg')
+import matplotlib.pyplot as plt
 
 import torch
 import torch.optim as optim
@@ -64,7 +68,8 @@ def train_one_epoch(args, model, train_loader, optimizer, len_vocab):
         optimizer.step()        
 
     epoch_loss = epoch_loss/nb_train
-    print("Train loss: " + str(epoch_loss))
+    logging.info("Train loss: " + str(epoch_loss))
+    return epoch_loss
 
 def val_one_epoch(args, model, val_loader, optimizer, len_vocab):
     model.eval()
@@ -90,8 +95,8 @@ def val_one_epoch(args, model, val_loader, optimizer, len_vocab):
             epoch_loss+=batch_loss.item()
    
     epoch_loss = epoch_loss/nb_val
-    print("Val loss: " + str(epoch_loss))
-
+    logging.info("Val loss: " + str(epoch_loss))
+    return epoch_loss
 
 def train(args, model, train_loader, val_loader, len_vocab):
     logging.warning("Beginning training")
@@ -101,13 +106,45 @@ def train(args, model, train_loader, val_loader, len_vocab):
     if torch.cuda.is_available():
         model = model.cuda()
 
+    train_loss_array = []
+    val_loss_array = []
 
-    print("No of epochs: " + str(args.max_nb_epochs))
+    train_epoch_array = []
+    val_epoch_array = []
+
+    logging.info("No of epochs: " + str(args.max_nb_epochs))
     while args.current_epoch < args.max_nb_epochs:
         args.current_epoch += 1
         logging.info("\nEpoch {}".format(args.current_epoch))
-        train_stats = train_one_epoch(args, model, train_loader, optimizer, len_vocab)
-        val_stats = val_one_epoch(args,model,val_loader, optimizer, len_vocab)
+        
+        t0=time.time()
+        train_loss = train_one_epoch(args, model, train_loader, optimizer, len_vocab)
+        logging.info("Training done in: " + "{} seconds".format(time.time() - t0))
+        
+        t0 = time.time()
+        val_loss = val_one_epoch(args,model,val_loader, optimizer, len_vocab)
+    
+        logging.info("Validation done in: " + "{} seconds".format(time.time() - t0))
+
+        torch.save({
+            'epoch': args.current_epoch,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            }, os.path.join(args.experiment_dir, "epoch_" + str(args.current_epoch) + ".pth.tar"))
+
+        train_loss_array.append(train_loss)
+        val_loss_array.append(val_loss)
+
+        train_epoch_array.append(args.current_epoch)
+        val_epoch_array.append(args.current_epoch)
+
+    plt.plot(train_epoch_array, train_loss_array, label='Training loss')
+    plt.plot(val_epoch_array, val_loss_array, label = 'Validation loss')
+    plt.legend()
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.savefig(os.path.join(args.experiment_dir, "loss_stats.png"))
+    
 
 #####################################
 #               MAIN                #
@@ -153,7 +190,7 @@ def main():
 
     model = Caption_Model(dict_size=len(vocab),
                           image_feature_dim=feature_dim, vocab=vocab)
-
+    logging.info(model)
     train(args, model, train_loader, val_loader, len(vocab))
 
 if __name__ == "__main__":
