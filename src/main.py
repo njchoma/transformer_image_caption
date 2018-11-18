@@ -30,6 +30,7 @@ else:
 #               TRAINING                #
 #########################################
 def train_one_epoch(args, model, train_loader, optimizer, len_vocab):
+    model.train()
     nb_batch = len(train_loader)
     nb_train = nb_batch * args.batch_size
     logging.info("Training {} batches, {} samples.".format(nb_batch, nb_train))
@@ -63,9 +64,36 @@ def train_one_epoch(args, model, train_loader, optimizer, len_vocab):
         optimizer.step()        
 
     epoch_loss = epoch_loss/nb_train
-    print(epoch_loss)
+    print("Train loss: " + str(epoch_loss))
 
-def train(args, model, train_loader, valid_loader, len_vocab):
+def val_one_epoch(args, model, val_loader, optimizer, len_vocab):
+    model.eval()
+    nb_batch = len(val_loader)
+    nb_val = nb_batch * args.batch_size
+    logging.info("Validating {} batches, {} samples.".format(nb_batch, nb_val))
+
+    loss = torch.nn.CrossEntropyLoss()
+    
+    epoch_loss = 0
+
+    with torch.no_grad():
+        for i, (features, captions, lengths) in enumerate(val_loader):
+        #print(i)
+            len_captions = len(captions[0])
+            if torch.cuda.is_available():
+                features, captions = features.cuda(), captions.cuda()
+
+            out = model(features, len_captions)
+            n_ex, vocab_len = out.view(-1, len_vocab).shape
+            captions = captions[:,1:]
+            batch_loss = loss(out.view(-1,len_vocab),captions.contiguous().view(1, n_ex).squeeze())
+            epoch_loss+=batch_loss.item()
+   
+    epoch_loss = epoch_loss/nb_val
+    print("Val loss: " + str(epoch_loss))
+
+
+def train(args, model, train_loader, val_loader, len_vocab):
     logging.warning("Beginning training")
     optimizer = optim.Adam(model.parameters(), lr=0.001)
     scheduler = ReduceLROnPlateau(optimizer, 'min')
@@ -79,6 +107,7 @@ def train(args, model, train_loader, valid_loader, len_vocab):
         args.current_epoch += 1
         logging.info("\nEpoch {}".format(args.current_epoch))
         train_stats = train_one_epoch(args, model, train_loader, optimizer, len_vocab)
+        val_stats = val_one_epoch(args,model,val_loader, optimizer, len_vocab)
 
 #####################################
 #               MAIN                #
@@ -111,14 +140,21 @@ def main():
                               shuffle=True,
                               num_workers=0,
                               debug=args.debug)
-    valid_loader = None
+
+    val_loader = get_loader(data_root=args.root_dir,
+                              vocab=vocab,
+                              batch_size=args.batch_size,
+                              data_type='val',
+                              shuffle=True,
+                              num_workers=0,
+                              debug=args.debug)
     test_loader  = None
     logging.info("Done.")
 
     model = Caption_Model(dict_size=len(vocab),
                           image_feature_dim=feature_dim, vocab=vocab)
 
-    train(args, model, train_loader, valid_loader, len(vocab))
+    train(args, model, train_loader, val_loader, len(vocab))
 
 if __name__ == "__main__":
     main()

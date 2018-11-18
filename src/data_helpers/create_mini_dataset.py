@@ -1,7 +1,7 @@
 import os
 import h5py
 import numpy as np
-data_type = 'train'
+data_type = 'val'
 data_root = '/scratch/ovd208/COCO_features/data/'
 file_name = os.path.join(data_root, data_type + '36.hdf5')
 data_h5 = h5py.File(file_name, 'r')

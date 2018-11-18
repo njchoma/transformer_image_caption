@@ -46,7 +46,7 @@ class CocoDataset(data.Dataset):
         self.debug = debug
         if debug:
             file_name = data_root + '/' + data_type + "36_mini.hdf5"
-            with open(os.path.join(data_root,"mini_anno.pkl"), 'rb') as f:
+            with open(os.path.join(data_root, data_type + "_mini_anno.pkl"), 'rb') as f:
                 self.mini_coco = pickle.load(f)
             
             ids = list(self.mini_coco.keys())
