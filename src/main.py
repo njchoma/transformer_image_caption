@@ -100,7 +100,11 @@ def val_one_epoch(args, model, val_loader, optimizer, len_vocab):
 
 def train(args, model, train_loader, val_loader, len_vocab):
     logging.warning("Beginning training")
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    if args.opt == "Adam":
+        optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    elif args.opt == "SGD":
+        optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum = 0.899999976158, weight_decay=0.000500000023749)
+    
     scheduler = ReduceLROnPlateau(optimizer, 'min')
 
     if torch.cuda.is_available():

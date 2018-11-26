@@ -25,7 +25,11 @@ def read_args():
     add_arg('--batch_size', type=int, default=1,
             help='Minibatch size')
     add_arg('--max_nb_epochs', type=int, default=1000,
-            help='Maximum number of epochs to train')
+            help='Maximum number of epochs to train') 
+    add_arg('--lr', type=float, default=0.001,
+            help='Learning rate')
+    add_arg('--opt', type=str, default="ADAM",
+            help='Optimization method')
 
     return parser.parse_args()
 
