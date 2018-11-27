@@ -61,8 +61,8 @@ class Caption_Model(nn.Module):
         return y_out
 
     def initialize_inference(self, vocab, nb_batch, cuda):
-        start_word = torch.from_numpy(data_loader.indexto1hot(len(vocab), vocab('<start>'))).float()
-        start_word.unsqueeze_(0)
+        start_word = data_loader.indexto1hot(len(vocab), vocab('<start>'))
+        start_word = torch.from_numpy(start_word).float().unsqueeze(0)
         #print(start_word.shape)
         copy = start_word.clone()
         for i in range(nb_batch-1):
@@ -71,9 +71,16 @@ class Caption_Model(nn.Module):
         #print(start_word.shape)    
 
         if cuda:
-            return torch.cuda.FloatTensor(nb_batch, NB_HIDDEN_LSTM1) , torch.cuda.FloatTensor(nb_batch,NB_HIDDEN_LSTM1), torch.cuda.FloatTensor(nb_batch,NB_HIDDEN_LSTM2), torch.cuda.FloatTensor(nb_batch,NB_HIDDEN_LSTM2), start_word.cuda()
+            t = torch.cuda
+            start_word = start_word.cuda()
         else:
-            return torch.FloatTensor(nb_batch, NB_HIDDEN_LSTM1) , torch.FloatTensor(nb_batch,NB_HIDDEN_LSTM1), torch.FloatTensor(nb_batch,NB_HIDDEN_LSTM2), torch.FloatTensor(nb_batch,NB_HIDDEN_LSTM2), start_word
+            t = torch
+
+        h1 = t.FloatTensor(nb_batch, NB_HIDDEN_LSTM1)
+        c1 = t.FloatTensor(nb_batch, NB_HIDDEN_LSTM1)
+        h2 = t.FloatTensor(nb_batch, NB_HIDDEN_LSTM2)
+        c2 = t.FloatTensor(nb_batch, NB_HIDDEN_LSTM2)
+        return h1, c1, h2, c2, start_word
 
 
 
