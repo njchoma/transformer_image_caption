@@ -71,7 +71,7 @@ def train_one_epoch(args, model, train_loader, optimizer, len_vocab):
     logging.info("Train loss: " + str(epoch_loss))
     return epoch_loss
 
-def val_one_epoch(args, model, val_loader, optimizer, len_vocab):
+def val_one_epoch(args, model, val_loader, optimizer, len_vocab, beam=None):
     model.eval()
     nb_batch = len(val_loader)
     nb_val = nb_batch * args.batch_size
@@ -88,6 +88,10 @@ def val_one_epoch(args, model, val_loader, optimizer, len_vocab):
             if torch.cuda.is_available():
                 features, captions = features.cuda(), captions.cuda()
 
+            if beam is not None:
+                if (i % 200) == 0:
+                    sentences = model(features, 20, beam)
+                    print(sentences)
             out = model(features, len_captions)
             n_ex, vocab_len = out.view(-1, len_vocab).shape
             captions = captions[:,1:]
@@ -123,12 +127,12 @@ def train(args, model, train_loader, val_loader, len_vocab):
         
         t0=time.time()
         train_loss = train_one_epoch(args, model, train_loader, optimizer, len_vocab)
-        logging.info("Training done in: " + "{} seconds".format(time.time() - t0))
+        logging.info("Train done in: {:3.1f} seconds".format(time.time() - t0))
         
         t0 = time.time()
-        val_loss = val_one_epoch(args,model,val_loader, optimizer, len_vocab)
+        val_loss = val_one_epoch(args,model,val_loader, optimizer, len_vocab, beam=3)
     
-        logging.info("Validation done in: " + "{} seconds".format(time.time() - t0))
+        logging.info("Valid done in: {:3.1f} seconds".format(time.time() - t0))
 
         torch.save({
             'epoch': args.current_epoch,
