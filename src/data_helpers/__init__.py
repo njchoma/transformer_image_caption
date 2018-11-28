@@ -1,2 +1,1 @@
-import data_loader
-import vocab
+from data_helpers import vocab

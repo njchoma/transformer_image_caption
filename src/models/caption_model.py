@@ -1,11 +1,11 @@
+import heapq
+from copy import deepcopy
+
 import torch
 import torch.nn as nn
 
-#import sys
-#sys.path.append("..")
 from data_helpers import vocab
 from data_helpers import data_loader
-#from vocab import Vocabulary
 import models.utils_models as utils
 
 
@@ -38,31 +38,34 @@ class Caption_Model(nn.Module):
         self.attention = Visual_Attention(image_feature_dim,
                                           NB_HIDDEN_LSTM1,
                                           NB_HIDDEN_ATT)
-        self.predict_word = nn.Linear(NB_HIDDEN_LSTM2, dict_size)
+        self.predict_word = Predict_Word(NB_HIDDEN_LSTM2, dict_size)
         self.vocab = vocab
     
-    def forward(self, image_features, nb_timesteps):
+    def forward(self, image_features, nb_timesteps, beam=None):
+        if beam is not None:
+            return self.beam_search(image_features, nb_timesteps, beam)
+
         nb_batch, nb_image_feats, _ = image_features.size()
         v_mean = image_features.mean(dim=1)
         #print(v_mean.shape)
-        h1, c1, h2, c2, current_word = self.initialize_inference(self.vocab, nb_batch, cuda = image_features.is_cuda)
+        h1, c1, h2, c2, current_word = self.init_inference(nb_batch,
+                                                       image_features.is_cuda)
         y_out = utils.make_zeros((nb_batch, nb_timesteps-1, self.dict_size),
                                  cuda = image_features.is_cuda)
+
         for t in range(nb_timesteps-1):
             word_emb = self.embed_word(current_word)
             h1, c1 = self.lstm1(h1, c1, h2, v_mean, word_emb)
             v_hat = self.attention(image_features,h1)
             h2, c2 = self.lstm2(h2, c2, h1, v_hat)
-            #print(h2.shape)
             y = self.predict_word(h2)
-            #print(y.shape)
             y_out[:,t,:] = y
 
         return y_out
 
-    def initialize_inference(self, vocab, nb_batch, cuda):
-        start_word = torch.from_numpy(data_loader.indexto1hot(len(vocab), vocab('<start>'))).float()
-        start_word.unsqueeze_(0)
+    def init_inference(self, nb_batch, cuda):
+        start_word = data_loader.indexto1hot(len(self.vocab), self.vocab('<start>'))
+        start_word = torch.from_numpy(start_word).float().unsqueeze(0)
         #print(start_word.shape)
         copy = start_word.clone()
         for i in range(nb_batch-1):
@@ -71,11 +74,167 @@ class Caption_Model(nn.Module):
         #print(start_word.shape)    
 
         if cuda:
-            return torch.cuda.FloatTensor(nb_batch, NB_HIDDEN_LSTM1) , torch.cuda.FloatTensor(nb_batch,NB_HIDDEN_LSTM1), torch.cuda.FloatTensor(nb_batch,NB_HIDDEN_LSTM2), torch.cuda.FloatTensor(nb_batch,NB_HIDDEN_LSTM2), start_word.cuda()
+            t = torch.cuda
+            start_word = start_word.cuda()
         else:
-            return torch.FloatTensor(nb_batch, NB_HIDDEN_LSTM1) , torch.FloatTensor(nb_batch,NB_HIDDEN_LSTM1), torch.FloatTensor(nb_batch,NB_HIDDEN_LSTM2), torch.FloatTensor(nb_batch,NB_HIDDEN_LSTM2), start_word
+            t = torch
+
+        h1 = t.FloatTensor(nb_batch, NB_HIDDEN_LSTM1)
+        c1 = t.FloatTensor(nb_batch, NB_HIDDEN_LSTM1)
+        h2 = t.FloatTensor(nb_batch, NB_HIDDEN_LSTM2)
+        c2 = t.FloatTensor(nb_batch, NB_HIDDEN_LSTM2)
+        return h1, c1, h2, c2, start_word
 
 
+    def beam_search(self, image_features, max_nb_words, beam_width):
+        # Initialize model
+        nb_batch, nb_image_feats, _ = image_features.size()
+        v_mean = image_features.mean(dim=1)
+        h1, c1, h2, c2, current_word = self.init_inference(nb_batch,
+                                                       image_features.is_cuda)
+        # Initialize beam search
+        end_word = data_loader.indexto1hot(len(self.vocab), self.vocab('<end>'))
+        end_word = torch.from_numpy(end_word).float().unsqueeze(0)
+        end_word = end_word.cuda() if image_features.is_cuda else end_word
+        beam = Beam(beam_width)
+        s = Sentence(max_nb_words, beam_width, end_word, self.vocab)
+        s.update_state(1.0, h1, c1, h2, c2, current_word)
+        beam.push(s)
+
+        # Perform beam search
+        final_beam = Beam(beam_width)
+        while len(beam) > 0:
+            s = beam.pop()
+            new_s = self.update_states(s, image_features, v_mean)
+            for s in new_s:
+                if s.ended:
+                    final_beam.push(s)
+                else:
+                    beam.push(s)
+            beam.trim()
+            final_beam.trim()
+
+        # Extract final sentences
+        sentences = []
+        while len(final_beam) > 0:
+            s = final_beam.pop()
+            sentences.append(s.extract_sentence())
+        
+        return sentences
+
+    def update_states(self, s, image_features, v_mean):
+        h1, c1, h2, c2, current_word = s.get_states()
+        word_emb = self.embed_word(current_word)
+        h1, c1 = self.lstm1(h1, c1, h2, v_mean, word_emb)
+        v_hat = self.attention(image_features,h1)
+        h2, c2 = self.lstm2(h2, c2, h1, v_hat)
+        y = self.predict_word(h2)
+
+        new_s = s.update_words(s, h1, c1, h2, c2, y)
+        return new_s
+
+#################################################
+#                   BEAM SEARCH                 #
+#################################################
+class Sentence(object):
+    def __init__(self, max_nb_words, beam_width, end_word, vocab):
+        self.max_nb_words = max_nb_words
+        self.beam_width = beam_width
+        self.words = []
+        self.probability = 1.0
+        self.end_word = end_word
+        self.ended = False
+        self.vocab = vocab
+
+    def update_words(self, s, h1, c1, h2, c2, y):
+        new_s = []
+        for i in range(self.beam_width):
+            val, idx = y.max(dim=1)
+            current_word = y.clone()
+            current_word[0,:] = 0
+            current_word[0,idx] = 1
+            s2 = s.copy()
+            s2.update_state(val,
+                            h2.clone(),
+                            c1.clone(),
+                            h2.clone(),
+                            c2.clone(),
+                            current_word)
+            new_s.append(s2)
+            if s2.ended:
+                break
+            y[0, idx] = 0
+        return new_s
+
+    def update_state(self, p, h1, c1, h2, c2, current_word):
+        self.h1 = h1
+        self.c1 = c1
+        self.h2 = h2
+        self.c2 = c2
+        self.words.append(current_word)
+        self._update_probability(p)
+        self._update_finished()
+
+    def get_states(self):
+        return self.h1, self.c1, self.h2, self.c2, self.words[-1]
+
+    def extract_sentence(self):
+        sentence = []
+        for w in self.words:
+            idx = w.max(1)[1].item()
+            sentence.append(self.vocab.get_word(idx))
+        return [self.probability, sentence]
+
+    def _update_probability(self, p):
+        n = len(self.words)
+        self.probability = (self.probability * (n-1) + p) / n
+
+    def _update_finished(self):
+        n = len(self.words)
+        f = self.words[-1]
+        if (n > self.max_nb_words) or (f == self.end_word).all():
+            self.ended = True
+
+    def copy(self):
+        new = Sentence(self.max_nb_words,
+                       self.beam_width,
+                       self.end_word,
+                       self.vocab)
+        new.words = [w.clone() for w in self.words]
+        new.probability = self.probability
+        return new
+
+    def __lt__(self, other):
+        return self.probability < other.probability
+
+    def __repr__(self):
+        s = ''
+        for w in self.words:
+            idx = w.max(1)[1].item()
+            s += "{}, ".format(self.vocab.get_word(idx))
+        return s
+    
+
+
+
+
+class Beam(object):
+    def __init__(self, beam_width):
+        self.beam_width = beam_width
+        self.heap = []
+
+    def push(self, s):
+        heapq.heappush(self.heap, s)
+
+    def pop(self):
+        return heapq.heappop(self.heap)
+
+    def trim(self):
+        while len(self.heap) > self.beam_width:
+            heapq.heappop(self.heap)
+
+    def __len__(self):
+        return len(self.heap)
 
 #####################################################
 #               LANGUAGE SUB-MODULES                #
@@ -143,8 +302,8 @@ class Predict_Word(nn.Module):
     def __init__(self, dim_language_lstm, dict_size):
         super(Predict_Word, self).__init__()
         self.fc = nn.Linear(dim_language_lstm, dict_size)
+        self.act = nn.Sigmoid()
         
-    def forward(self, h2, true_word):
-        true_idx = (true_word==1).nonzero()
-        y = self.fc(h2)[true_idx]
-        return y, true_word
+    def forward(self, h2):
+        y = self.act(self.fc(h2))
+        return y

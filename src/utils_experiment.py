@@ -28,7 +28,7 @@ def read_args():
             help='Maximum number of epochs to train') 
     add_arg('--lr', type=float, default=0.001,
             help='Learning rate')
-    add_arg('--opt', type=str, default="ADAM",
+    add_arg('--opt', type=str, default="Adam",
             help='Optimization method')
 
     return parser.parse_args()

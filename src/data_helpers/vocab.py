@@ -20,6 +20,9 @@ class Vocabulary(object):
             self.idx2word[self.idx] = word
             self.idx += 1
 
+    def get_word(self, idx):
+        return self.idx2word[idx]
+
     def __call__(self, word):
         if not word in self.word2idx:
             return self.word2idx['<unk>']
