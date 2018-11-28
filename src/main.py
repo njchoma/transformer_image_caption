@@ -67,7 +67,7 @@ def train_one_epoch(args, model, train_loader, optimizer, len_vocab):
         batch_loss.backward()
         optimizer.step()        
 
-    epoch_loss = epoch_loss/nb_train
+    epoch_loss = epoch_loss/nb_batch 
     logging.info("Train loss: " + str(epoch_loss))
     return epoch_loss
 
@@ -94,12 +94,13 @@ def val_one_epoch(args, model, val_loader, optimizer, len_vocab):
             batch_loss = loss(out.view(-1,len_vocab),captions.contiguous().view(1, n_ex).squeeze())
             epoch_loss+=batch_loss.item()
    
-    epoch_loss = epoch_loss/nb_val
+    epoch_loss = epoch_loss/nb_batch
     logging.info("Val loss: " + str(epoch_loss))
     return epoch_loss
 
 def train(args, model, train_loader, val_loader, len_vocab):
     logging.warning("Beginning training")
+    optimizer = None
     if args.opt == "Adam":
         optimizer = optim.Adam(model.parameters(), lr=args.lr)
     elif args.opt == "SGD":
@@ -116,6 +117,9 @@ def train(args, model, train_loader, val_loader, len_vocab):
     train_epoch_array = []
     val_epoch_array = []
 
+    val_loss = val_one_epoch(args,model,val_loader, optimizer, len_vocab)
+    logging.info("Validation loss with random initialization: " + str(val_loss))
+    
     logging.info("No of epochs: " + str(args.max_nb_epochs))
     while args.current_epoch < args.max_nb_epochs:
         args.current_epoch += 1
