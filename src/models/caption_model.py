@@ -1,5 +1,6 @@
 import heapq
 from copy import deepcopy
+from math import log2
 
 import torch
 import torch.nn as nn
@@ -139,7 +140,7 @@ class Sentence(object):
         self.max_nb_words = max_nb_words
         self.beam_width = beam_width
         self.words = []
-        self.probability = 1.0
+        self.probability = 0
         self.end_word = end_word
         self.ended = False
         self.vocab = vocab
@@ -148,6 +149,7 @@ class Sentence(object):
         new_s = []
         for i in range(self.beam_width):
             val, idx = y.max(dim=1)
+            y[0, idx] -= val
             current_word = y.clone()
             current_word[0,:] = 0
             current_word[0,idx] = 1
@@ -161,7 +163,6 @@ class Sentence(object):
             new_s.append(s2)
             if s2.ended:
                 break
-            y[0, idx] = 0
         return new_s
 
     def update_state(self, p, h1, c1, h2, c2, current_word):
@@ -184,8 +185,7 @@ class Sentence(object):
         return [self.probability, sentence]
 
     def _update_probability(self, p):
-        n = len(self.words)
-        self.probability = (self.probability * (n-1) + p) / n
+        self.probability += log2(p)
 
     def _update_finished(self):
         n = len(self.words)
@@ -307,7 +307,7 @@ class Predict_Word(nn.Module):
     def __init__(self, dim_language_lstm, dict_size):
         super(Predict_Word, self).__init__()
         self.fc = nn.Linear(dim_language_lstm, dict_size)
-        self.act = nn.Sigmoid()
+        self.act = nn.Softmax(dim=1)
         
     def forward(self, h2):
         y = self.act(self.fc(h2))

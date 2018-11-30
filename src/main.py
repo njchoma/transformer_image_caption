@@ -48,10 +48,6 @@ def train_one_epoch(args, model, train_loader, optimizer, len_vocab):
         if torch.cuda.is_available():
             features, captions = features.cuda(), captions.cuda()
 
-        t0 = time.time()
-        print(model(features, 10, 4))
-        print("Time: {:2.2f}s".format(time.time() - t0))
-        exit()
         out = model(features, len_captions)
         #print(out)
         n_ex, vocab_len = out.view(-1, len_vocab).shape
@@ -72,7 +68,7 @@ def train_one_epoch(args, model, train_loader, optimizer, len_vocab):
         optimizer.step()        
 
     epoch_loss = epoch_loss/nb_batch 
-    logging.info("Train loss: " + str(epoch_loss))
+    logging.info("Train loss: {:>.3E}".format(epoch_loss))
     return epoch_loss
 
 def val_one_epoch(args, model, val_loader, optimizer, len_vocab, beam=None):
@@ -103,7 +99,7 @@ def val_one_epoch(args, model, val_loader, optimizer, len_vocab, beam=None):
             epoch_loss+=batch_loss.item()
    
     epoch_loss = epoch_loss/nb_batch
-    logging.info("Val loss: " + str(epoch_loss))
+    logging.info("Val loss: {:>.3E}".format(epoch_loss))
     return epoch_loss
 
 
@@ -121,7 +117,11 @@ def save_final_captions(args, model, val_loader, max_sent_len, beam_width):
                 features = features.cuda()
             sentence = model(features, max_sent_len, beam_width)
             s.add_sentence(image_ids[0], sentence[1])
+            if (i % 50) == 0:
+                logging.info("  {:4d}".format(i))
+    logging.info("Saving sentences...")
     s.save_sentences()
+    logging.info("Done.")
 
 
 def train(args, model, train_loader, val_loader, len_vocab):
@@ -144,7 +144,7 @@ def train(args, model, train_loader, val_loader, len_vocab):
     val_epoch_array = []
 
 
-    val_loss = val_one_epoch(args,model,val_loader, optimizer, len_vocab)
+    val_loss = val_one_epoch(args,model,val_loader, optimizer, len_vocab, 3)
     logging.info("Validation loss with random initialization: " + str(val_loss))
     
     logging.info("No of epochs: " + str(args.max_nb_epochs))
@@ -229,16 +229,15 @@ def main():
     logging.info(model)
     train(args, model, train_loader, val_loader, len(vocab))
 
-    '''
+    logging.warning("WARNING: USING VALIDATION DATA FOR TEST")
     test_loader = get_loader(data_root=args.root_dir,
                               vocab=vocab,
                               batch_size=1,
-                              data_type='test',
+                              data_type='val',
                               shuffle=True,
                               num_workers=0,
                               debug=args.debug)
-    save_final_captions(args, model, test_loader, max_sent_len=20, beam_width=5)
-    '''
+    save_final_captions(args, model, test_loader, max_sent_len=12, beam_width=5)
 
 if __name__ == "__main__":
     main()
