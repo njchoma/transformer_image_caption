@@ -114,13 +114,11 @@ class Caption_Model(nn.Module):
             beam.trim()
             final_beam.trim()
 
-        # Extract final sentences
-        sentences = []
-        while len(final_beam) > 0:
-            s = final_beam.pop()
-            sentences.append(s.extract_sentence())
+        # Extract final sentence
+        s = final_beam.pop()
+        sentence = s.extract_sentence()
         
-        return sentences
+        return sentence
 
     def update_states(self, s, image_features, v_mean):
         h1, c1, h2, c2, current_word = s.get_states()
@@ -224,14 +222,21 @@ class Beam(object):
         self.heap = []
 
     def push(self, s):
+        s.probability *= -1
         heapq.heappush(self.heap, s)
 
     def pop(self):
-        return heapq.heappop(self.heap)
+        s = heapq.heappop(self.heap)
+        s.probability *= -1
+        return s
 
     def trim(self):
-        while len(self.heap) > self.beam_width:
-            heapq.heappop(self.heap)
+        h2 = []
+        for i in range(self.beam_width):
+            if len(self.heap) == 0:
+                break
+            heapq.heappush(h2, heapq.heappop(self.heap))
+        self.heap=h2
 
     def __len__(self):
         return len(self.heap)

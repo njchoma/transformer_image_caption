@@ -48,6 +48,10 @@ def train_one_epoch(args, model, train_loader, optimizer, len_vocab):
         if torch.cuda.is_available():
             features, captions = features.cuda(), captions.cuda()
 
+        t0 = time.time()
+        print(model(features, 10, 4))
+        print("Time: {:2.2f}s".format(time.time() - t0))
+        exit()
         out = model(features, len_captions)
         #print(out)
         n_ex, vocab_len = out.view(-1, len_vocab).shape
@@ -121,8 +125,10 @@ def train(args, model, train_loader, val_loader, len_vocab):
     train_epoch_array = []
     val_epoch_array = []
 
+    '''
     val_loss = val_one_epoch(args,model,val_loader, optimizer, len_vocab)
     logging.info("Validation loss with random initialization: " + str(val_loss))
+    '''
     
     logging.info("No of epochs: " + str(args.max_nb_epochs))
     while args.current_epoch < args.max_nb_epochs:
