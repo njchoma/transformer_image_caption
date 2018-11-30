@@ -107,7 +107,7 @@ def val_one_epoch(args, model, val_loader, optimizer, len_vocab, beam=None):
     return epoch_loss
 
 
-def save_final_captions(args, model, val_loader, optimizer, len_vocab, beam=5):
+def save_final_captions(args, model, val_loader, max_sent_len, beam_width):
     nb_batch = len(val_loader)
     nb_val = nb_batch * args.batch_size
     assert nb_batch == nb_val # Must be equal for beam search
@@ -119,7 +119,7 @@ def save_final_captions(args, model, val_loader, optimizer, len_vocab, beam=5):
         for i, (image_ids, features, captions, lengths) in enumerate(val_loader):
             if torch.cuda.is_available():
                 features = features.cuda()
-            sentence = model(features, 20, beam)
+            sentence = model(features, max_sent_len, beam_width)
             s.add_sentence(image_ids[0], sentence[1])
     s.save_sentences()
 
@@ -143,8 +143,6 @@ def train(args, model, train_loader, val_loader, len_vocab):
     train_epoch_array = []
     val_epoch_array = []
 
-    save_final_captions(args,model,val_loader, optimizer, len_vocab)
-    exit()
 
     val_loss = val_one_epoch(args,model,val_loader, optimizer, len_vocab)
     logging.info("Validation loss with random initialization: " + str(val_loss))
@@ -181,6 +179,7 @@ def train(args, model, train_loader, val_loader, len_vocab):
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.savefig(os.path.join(args.experiment_dir, "loss_stats.png"))
+
     
 
 #####################################
@@ -229,6 +228,17 @@ def main():
                           image_feature_dim=feature_dim, vocab=vocab)
     logging.info(model)
     train(args, model, train_loader, val_loader, len(vocab))
+
+    '''
+    test_loader = get_loader(data_root=args.root_dir,
+                              vocab=vocab,
+                              batch_size=1,
+                              data_type='test',
+                              shuffle=True,
+                              num_workers=0,
+                              debug=args.debug)
+    save_final_captions(args, model, test_loader, max_sent_len=20, beam_width=5)
+    '''
 
 if __name__ == "__main__":
     main()
