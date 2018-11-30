@@ -42,7 +42,7 @@ def train_one_epoch(args, model, train_loader, optimizer, len_vocab):
     loss = torch.nn.CrossEntropyLoss()
     
     epoch_loss = 0
-    for i, (features, captions, lengths) in enumerate(train_loader):
+    for i, (image_ids, features, captions, lengths) in enumerate(train_loader):
         #print(i)
         len_captions = len(captions[0])
         if torch.cuda.is_available():
@@ -86,7 +86,7 @@ def val_one_epoch(args, model, val_loader, optimizer, len_vocab, beam=None):
     epoch_loss = 0
 
     with torch.no_grad():
-        for i, (features, captions, lengths) in enumerate(val_loader):
+        for i, (image_ids, features, captions, lengths) in enumerate(val_loader):
         #print(i)
             len_captions = len(captions[0])
             if torch.cuda.is_available():
@@ -105,6 +105,24 @@ def val_one_epoch(args, model, val_loader, optimizer, len_vocab, beam=None):
     epoch_loss = epoch_loss/nb_batch
     logging.info("Val loss: " + str(epoch_loss))
     return epoch_loss
+
+
+def save_final_captions(args, model, val_loader, optimizer, len_vocab, beam=5):
+    nb_batch = len(val_loader)
+    nb_val = nb_batch * args.batch_size
+    assert nb_batch == nb_val # Must be equal for beam search
+    logging.info("Captioning {} batches, {} samples.".format(nb_batch, nb_val))
+
+    s = utils.Sentences(args.experiment_dir)
+    model.eval()
+    with torch.no_grad():
+        for i, (image_ids, features, captions, lengths) in enumerate(val_loader):
+            if torch.cuda.is_available():
+                features = features.cuda()
+            sentence = model(features, 20, beam)
+            s.add_sentence(image_ids[0], sentence[1])
+    s.save_sentences()
+
 
 def train(args, model, train_loader, val_loader, len_vocab):
     logging.warning("Beginning training")
@@ -125,10 +143,11 @@ def train(args, model, train_loader, val_loader, len_vocab):
     train_epoch_array = []
     val_epoch_array = []
 
-    '''
+    save_final_captions(args,model,val_loader, optimizer, len_vocab)
+    exit()
+
     val_loss = val_one_epoch(args,model,val_loader, optimizer, len_vocab)
     logging.info("Validation loss with random initialization: " + str(val_loss))
-    '''
     
     logging.info("No of epochs: " + str(args.max_nb_epochs))
     while args.current_epoch < args.max_nb_epochs:

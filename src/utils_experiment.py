@@ -1,4 +1,5 @@
 import os
+import json
 import yaml
 import logging
 import argparse
@@ -50,3 +51,21 @@ def load_args(experiment_dir, args_file):
         args = yaml.load(f)
     logging.info("Args loaded")
     return args
+
+#########################################################
+#                   SENTENCE OUTPUTS                    #
+#########################################################
+class Sentences(object):
+    def __init__(self, savedir):
+        self.sentences = []
+        os.makedirs(savedir, exist_ok=True)
+        self.filepath = os.path.join(savedir, "final_sentences.json")
+
+    def add_sentence(self, image_id, sentence):
+        caption = ' '.join(sentence[1:-1])
+        s = {'image_id':image_id, 'caption':caption}
+        self.sentences.append(s)
+
+    def save_sentences(self):
+        with open(self.filepath, 'w') as f:
+            json.dump(self.sentences, f)
