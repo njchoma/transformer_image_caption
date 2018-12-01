@@ -25,6 +25,8 @@ def read_args():
     # TRAINING
     add_arg('--batch_size', type=int, default=1,
             help='Minibatch size')
+    add_arg('--resume_epoch', type=int, default=0,
+            help='resume epoch number (0 if starting from scratch)')
     add_arg('--max_nb_epochs', type=int, default=1000,
             help='Maximum number of epochs to train') 
     add_arg('--lr', type=float, default=0.001,

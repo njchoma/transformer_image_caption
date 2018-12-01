@@ -1,6 +1,6 @@
 import heapq
 from copy import deepcopy
-from math import log2
+from math import log
 
 import torch
 import torch.nn as nn
@@ -185,7 +185,7 @@ class Sentence(object):
         return [self.probability, sentence]
 
     def _update_probability(self, p):
-        self.probability += log2(p)
+        self.probability += log(p,2)
 
     def _update_finished(self):
         n = len(self.words)
