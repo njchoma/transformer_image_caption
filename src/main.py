@@ -42,7 +42,7 @@ def train_one_epoch(args, model, train_loader, optimizer, len_vocab):
     loss = torch.nn.CrossEntropyLoss()
     
     epoch_loss = 0
-    for i, (features, captions, lengths) in enumerate(train_loader):
+    for i, (image_ids, features, captions, lengths) in enumerate(train_loader):
         #print(i)
         len_captions = len(captions[0])
         if torch.cuda.is_available():
@@ -68,7 +68,7 @@ def train_one_epoch(args, model, train_loader, optimizer, len_vocab):
         optimizer.step()        
 
     epoch_loss = epoch_loss/nb_batch 
-    logging.info("Train loss: " + str(epoch_loss))
+    logging.info("Train loss: {:>.3E}".format(epoch_loss))
     return epoch_loss
 
 def val_one_epoch(args, model, val_loader, optimizer, len_vocab, beam=None):
@@ -82,7 +82,7 @@ def val_one_epoch(args, model, val_loader, optimizer, len_vocab, beam=None):
     epoch_loss = 0
 
     with torch.no_grad():
-        for i, (features, captions, lengths) in enumerate(val_loader):
+        for i, (image_ids, features, captions, lengths) in enumerate(val_loader):
         #print(i)
             len_captions = len(captions[0])
             if torch.cuda.is_available():
@@ -99,7 +99,7 @@ def val_one_epoch(args, model, val_loader, optimizer, len_vocab, beam=None):
             epoch_loss+=batch_loss.item()
    
     epoch_loss = epoch_loss/nb_batch
-    logging.info("Val loss: " + str(epoch_loss))
+    logging.info("Val loss: {:>.3E}".format(epoch_loss))
     return epoch_loss
 
 def test_one_epoch(args, model, test_loader, optimizer, len_vocab, beam=None):
@@ -132,6 +132,27 @@ def test_one_epoch(args, model, test_loader, optimizer, len_vocab, beam=None):
     epoch_loss = epoch_loss/nb_batch
     logging.info("Test loss: " + str(epoch_loss))
     return epoch_loss
+
+def save_final_captions(args, model, val_loader, max_sent_len, beam_width):
+    nb_batch = len(val_loader)
+    nb_val = nb_batch * args.batch_size
+    assert nb_batch == nb_val # Must be equal for beam search
+    logging.info("Captioning {} batches, {} samples.".format(nb_batch, nb_val))
+
+    s = utils.Sentences(args.experiment_dir)
+    model.eval()
+    with torch.no_grad():
+        for i, (image_ids, features, captions, lengths) in enumerate(val_loader):
+            if torch.cuda.is_available():
+                features = features.cuda()
+            sentence = model(features, max_sent_len, beam_width)
+            s.add_sentence(image_ids[0], sentence[1])
+            if (i % 50) == 0:
+                logging.info("  {:4d}".format(i))
+    logging.info("Saving sentences...")
+    s.save_sentences()
+    logging.info("Done.")
+
 
 def train(args, model, train_loader, val_loader, test_loader, len_vocab):
     logging.warning("Beginning training")
@@ -193,6 +214,7 @@ def train(args, model, train_loader, val_loader, test_loader, len_vocab):
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.savefig(os.path.join(args.experiment_dir, "loss_stats.png"))
+
     
 
 #####################################
@@ -252,6 +274,16 @@ def main():
                           image_feature_dim=feature_dim, vocab=vocab)
     logging.info(model)
     train(args, model, train_loader, val_loader, test_loader, len(vocab))
+
+    logging.warning("WARNING: USING VALIDATION DATA FOR TEST")
+    test_loader = get_loader(data_root=args.root_dir,
+                              vocab=vocab,
+                              batch_size=1,
+                              data_type='val',
+                              shuffle=True,
+                              num_workers=0,
+                              debug=args.debug)
+    save_final_captions(args, model, test_loader, max_sent_len=12, beam_width=5)
 
 if __name__ == "__main__":
     main()

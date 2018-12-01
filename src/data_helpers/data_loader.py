@@ -99,7 +99,7 @@ class CocoDataset(data.Dataset):
         caption.append(vocab('<end>'))
         #print(len(caption))
         target = torch.Tensor(caption)
-        return features, target
+        return img_id, features, target
 
     def __len__(self):
         return len(self.ids)
@@ -126,8 +126,8 @@ def collate_fn(data):
     #print("Length of list: " + str(len(data)))
 
     # Sort a data list by caption length (descending order).
-    data.sort(key=lambda x: len(x[1]), reverse=True)
-    features, captions = zip(*data)
+    data.sort(key=lambda x: len(x[2]), reverse=True)
+    image_ids, features, captions = zip(*data)
 
     # Merge images (from tuple of 3D tensor to 4D tensor).
     features = torch.stack(features, 0)
@@ -145,7 +145,7 @@ def collate_fn(data):
     for i, cap in enumerate(captions):
         end = lengths[i]
         targets[i, :end] = cap[:end]        
-    return features, targets, lengths
+    return image_ids, features, targets, lengths
 
 def get_loader(data_root, vocab, batch_size, data_type, shuffle, num_workers, debug=False):
     """Returns torch.utils.data.DataLoader for custom coco dataset."""
