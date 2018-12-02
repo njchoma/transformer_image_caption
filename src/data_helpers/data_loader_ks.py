@@ -52,16 +52,18 @@ class CocoDataset(data.Dataset):
             
             ids = list(self.coco.keys())
         else:
-            file_name = os.path.join(data_root, "karpathy_splits" ,data_type + "36_ks.hdf5")
-            
-            with open(os.path.join(data_root, "karpathy_splits", data_type + "_karpathy.pkl"), 'rb') as f:
-                self.coco = pickle.load(f)
+            if data_type == 'train':
+                file_name = os.path.join(data_root, "karpathy_splits" ,data_type + "36_ks_med.hdf5") 
+                with open(os.path.join(data_root, "karpathy_splits", data_type + "_karpathy_medium.pkl"), 'rb') as f:
+                    self.coco = pickle.load(f)
+            else:
+                file_name = os.path.join(data_root, "karpathy_splits" ,data_type + "36_ks.hdf5") 
+                with open(os.path.join(data_root, "karpathy_splits", data_type + "_karpathy.pkl"), 'rb') as f:
+                    self.coco = pickle.load(f)
+                
             #ks_json_path = os.path.join(data_root,"karpathy_splits","cocotalk.json")
-            
             #ks_h5_path = os.path.join(data_root,"karpathy_splits","cocotalk.h5")
-            
             #self.coco = COCO(annotation_path)
-        
             ids = list(self.coco.keys())
 
         data_h5 = h5py.File(file_name,'r')       

@@ -307,8 +307,10 @@ class Predict_Word(nn.Module):
     def __init__(self, dim_language_lstm, dict_size):
         super(Predict_Word, self).__init__()
         self.fc = nn.Linear(dim_language_lstm, dict_size)
-        self.act = nn.Softmax(dim=1)
-        
+        #self.act = nn.Softmax(dim=1)
+        #self.act = nn.Sigmoid()        
+
     def forward(self, h2):
-        y = self.act(self.fc(h2))
+        #y = self.act(self.fc(h2))
+        y = self.fc(h2)
         return y
