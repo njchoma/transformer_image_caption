@@ -120,8 +120,8 @@ def test(args, model, test_loader, len_vocab, beam=None):
                 features, captions = features.cuda(), captions.cuda()
 
             if beam is not None:
-                if (i % 200) == 0:
-                    sentences = model(features, 20, beam)
+                if (i % (nb_batch//2)) == 0:
+                    sentences = model(features[0:1], 20, beam)
                     print(sentences)
             out = model(features, len_captions)
             n_ex, vocab_len = out.view(-1, len_vocab).shape

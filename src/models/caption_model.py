@@ -144,8 +144,10 @@ class Sentence(object):
         self.end_word = end_word
         self.ended = False
         self.vocab = vocab
+        self.act = nn.Softmax(dim=1)
 
     def update_words(self, s, h1, c1, h2, c2, y):
+        y = self.act(y)
         new_s = []
         for i in range(self.beam_width):
             val, idx = y.max(dim=1)
@@ -307,8 +309,7 @@ class Predict_Word(nn.Module):
     def __init__(self, dim_language_lstm, dict_size):
         super(Predict_Word, self).__init__()
         self.fc = nn.Linear(dim_language_lstm, dict_size)
-        self.act = nn.Softmax(dim=1)
         
     def forward(self, h2):
-        y = self.act(self.fc(h2))
+        y = self.fc(h2)
         return y
