@@ -157,6 +157,10 @@ def save_final_captions(args, model, val_loader, max_sent_len, beam_width):
 def train(args, model, train_loader, val_loader, len_vocab):
     logging.warning("Beginning training")
     optimizer = None
+
+    if torch.cuda.is_available():
+        model = model.cuda()
+
     print("args.opt: " + args.opt)
     if args.opt == "Adam":
         optimizer = optim.Adam(model.parameters(), lr=args.lr)
@@ -168,9 +172,6 @@ def train(args, model, train_loader, val_loader, len_vocab):
         optimizer.load_state_dict(args.checkpoint['optimizer_state_dict'])
         scheduler.load_state_dict(args.checkpoint['scheduler_state_dict'])
 
-    if torch.cuda.is_available():
-        model = model.cuda()
-
     train_loss_array = []
     val_loss_array = []
 
@@ -180,10 +181,11 @@ def train(args, model, train_loader, val_loader, len_vocab):
     train_epoch_array = []
     val_epoch_array = []
 
-    val_loss = val_one_epoch(args,model,val_loader, optimizer, len_vocab, beam=None)
-    logging.info("Validation loss with random initialization: " + str(val_loss))
+    if args.current_epoch == 0:
+        val_loss = val_one_epoch(args,model,val_loader, optimizer, len_vocab, beam=None)
+        logging.info("Validation loss with random initialization: " + str(val_loss))
     
-    logging.info("No of epochs: " + str(args.max_nb_epochs))
+    logging.info("Maximum of epochs: " + str(args.max_nb_epochs))
         
 
     while args.current_epoch < args.max_nb_epochs:
@@ -235,12 +237,18 @@ def create_model(args, vocab, feature_dim):
     model = Caption_Model(dict_size=len(vocab),
                             image_feature_dim=feature_dim, vocab=vocab)
     
-    args.current_epoch = args.resume_epoch    
-    if args.resume_epoch != 0:
+    if args.resume_epoch > 0:
         logging.info('Loading checkpoint')
-        args.checkpoint = torch.load(os.path.join(args.experiment_dir, "epoch_" + str(args.resume_epoch-1) + ".pth.tar" ))
+        args.checkpoint = torch.load(os.path.join(args.experiment_dir, "epoch_" + str(args.resume_epoch) + ".pth.tar" ))
         model.load_state_dict(args.checkpoint['model_state_dict'])
+        args.current_epoch = args.resume_epoch
+    elif args.resume_epoch < 0:
+        logging.info('Loading best checkpoint')
+        args.checkpoint = torch.load(os.path.join(args.experiment_dir, "best_model" + ".pth.tar" ))
+        model.load_state_dict(args.checkpoint['model_state_dict'])
+        args.current_epoch = args.checkpoint['epoch']
     else:
+        args.current_epoch = 0
         logging.info('No checkpoint used')
     
     return model
@@ -307,7 +315,7 @@ def main():
     test_loss = test(args,model,test_loader, len(vocab), beam=None)
     logging.info("Testing done in: {:3.1f} seconds".format(time.time() - t0))
     
-    save_final_captions(args, model, test_loader, max_sent_len=12, beam_width=5)
+    #save_final_captions(args, model, test_loader, max_sent_len=12, beam_width=5)
 
 if __name__ == "__main__":
     main()
