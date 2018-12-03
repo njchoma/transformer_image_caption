@@ -158,28 +158,6 @@ def train(args, model, train_loader, val_loader, len_vocab):
     logging.warning("Beginning training")
     optimizer = None
 
-    if torch.cuda.is_available():
-        model = model.cuda()
-
-    print("args.opt: " + args.opt)
-    if args.opt == "Adam":
-        optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    elif args.opt == "SGD":
-        optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum = 0.899999976158, weight_decay=0.000500000023749)
-    scheduler = ReduceLROnPlateau(optimizer, 'min')
-
-    if args.resume_epoch > 0:
-        optimizer.load_state_dict(args.checkpoint['optimizer_state_dict'])
-        scheduler.load_state_dict(args.checkpoint['scheduler_state_dict'])
-
-    train_loss_array = []
-    val_loss_array = []
-
-    #some big number
-    min_val_loss = 10000000
-
-    train_epoch_array = []
-    val_epoch_array = []
 
     if args.current_epoch == 0:
         val_loss = val_one_epoch(args,model,val_loader, optimizer, len_vocab, beam=None)
@@ -307,6 +285,28 @@ def main():
     logging.info("Test loader ready")
 
     model = create_model(args, vocab, feature_dim)
+    if torch.cuda.is_available():
+        model = model.cuda()
+
+    print("args.opt: " + args.opt)
+    if args.opt == "Adam":
+        optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    elif args.opt == "SGD":
+        optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum = 0.899999976158, weight_decay=0.000500000023749)
+    scheduler = ReduceLROnPlateau(optimizer, 'min')
+
+    if args.resume_epoch > 0:
+        optimizer.load_state_dict(args.checkpoint['optimizer_state_dict'])
+        scheduler.load_state_dict(args.checkpoint['scheduler_state_dict'])
+
+    train_loss_array = []
+    val_loss_array = []
+
+    #some big number
+    min_val_loss = 10000000
+
+    train_epoch_array = []
+    val_epoch_array = []
 
     logging.info(model)
     train(args, model, train_loader, val_loader, len(vocab))

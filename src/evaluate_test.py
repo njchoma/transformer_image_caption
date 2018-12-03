@@ -138,8 +138,8 @@ def main():
     logging.info("Test loader ready")
 
     model = create_model(args, vocab, feature_dim)
-    if args.resume_epoch > 0:
-        scheduler.load_state_dict(args.checkpoint['scheduler_state_dict'])
+    if torch.cuda.is_available():
+        model = model.cuda()
 
     logging.info(model)
 

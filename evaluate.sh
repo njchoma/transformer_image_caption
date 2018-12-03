@@ -10,7 +10,7 @@ ARTIFACTS_DIR="$SCRATCH/artifacts/image_captioning"
 NAME='ba_full_test_run'
 RUN_NB="$SLURM_ARRAY_TASK_ID"
 
-BATCH_SIZE=100
+BATCH_SIZE=1
 MAX_NB_EPOCHS=40
 
 echo "Starting $NAME"
