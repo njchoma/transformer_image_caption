@@ -128,9 +128,15 @@ class Caption_Model(nn.Module):
         v_hat = self.attention(image_features,h1)
         h2, c2 = self.lstm2(h2, c2, h1, v_hat)
         y = self.predict_word(h2)
+        y = self.remove_consecutive_words(y, current_word)
 
         new_s = s.update_words(s, h1, c1, h2, c2, y)
         return new_s
+
+    def remove_consecutive_words(self, y, prev_word):
+        # give previous word low score so as not to repeat words
+        y = y - 10**10 * prev_word
+        return y
 
 #################################################
 #                   BEAM SEARCH                 #
