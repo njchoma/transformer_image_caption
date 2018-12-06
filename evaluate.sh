@@ -15,7 +15,7 @@ MAX_NB_EPOCHS=40
 
 echo "Starting $NAME"
 
-OPTIONS="--resume_epoch 8"
+OPTIONS="--resume_epoch -1"
 
 PYARGS="--root_dir $ROOT_DIR --artifacts_dir $ARTIFACTS_DIR --name $NAME --max_nb_epochs $MAX_NB_EPOCHS --batch_size $BATCH_SIZE --run_nb $RUN_NB $OPTIONS"
 

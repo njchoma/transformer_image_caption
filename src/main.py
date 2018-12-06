@@ -287,6 +287,7 @@ def main():
     model = create_model(args, vocab, feature_dim)
     if torch.cuda.is_available():
         model = model.cuda()
+        logging.info("GPU type:\n{}".format(torch.cuda.get_device_name(0)))
 
     print("args.opt: " + args.opt)
     if args.opt == "Adam":
