@@ -48,7 +48,7 @@ def train_one_epoch(args, model, train_loader, optimizer, len_vocab):
         if torch.cuda.is_available():
             features, captions = features.cuda(), captions.cuda()
 
-        out = model(features, len_captions)
+        out = model(features, len_captions, captions)
         #print(out)
         n_ex, vocab_len = out.view(-1, len_vocab).shape
         #print(n_ex)
@@ -92,7 +92,7 @@ def val_one_epoch(args, model, val_loader, optimizer, len_vocab, beam=None):
                 if (i % 200) == 0:
                     sentences = model(features, 20, beam)
                     print(sentences)
-            out = model(features, len_captions)
+            out = model(features, len_captions, captions)
             n_ex, vocab_len = out.view(-1, len_vocab).shape
             captions = captions[:,1:]
             batch_loss = loss(out.view(-1,len_vocab),captions.contiguous().view(1, n_ex).squeeze())
@@ -105,7 +105,13 @@ def val_one_epoch(args, model, val_loader, optimizer, len_vocab, beam=None):
 def test(args, model, test_loader, len_vocab, beam=None):
     model.eval()
     nb_batch = len(test_loader)
-    nb_test = nb_batch * args.batch_size
+
+    if beam != None:
+        batch_size = 1
+    else:
+        batch_size = args.batch_size
+
+    nb_test = nb_batch * batch_size
     logging.info("Testing {} batches, {} samples.".format(nb_batch, nb_test))
 
     loss = torch.nn.CrossEntropyLoss()
@@ -121,9 +127,9 @@ def test(args, model, test_loader, len_vocab, beam=None):
 
             if beam is not None:
                 if (i % (nb_batch//2)) == 0:
-                    sentences = model(features[0:1], 20, beam)
+                    sentences = model(features[0:1], 20, captions, beam)
                     print(sentences)
-            out = model(features, len_captions)
+            out = model(features, len_captions, captions)
             n_ex, vocab_len = out.view(-1, len_vocab).shape
             captions = captions[:,1:]
             batch_loss = loss(out.view(-1,len_vocab),captions.contiguous().view(1, n_ex).squeeze())
@@ -135,7 +141,11 @@ def test(args, model, test_loader, len_vocab, beam=None):
 
 def save_final_captions(args, model, val_loader, max_sent_len, beam_width):
     nb_batch = len(val_loader)
-    nb_val = nb_batch * args.batch_size
+    if beam_width != None:
+        batch_size = 1
+    else:
+        batch_size = args.batch_size
+    nb_val = nb_batch * batch_size
     assert nb_batch == nb_val # Must be equal for beam search
     logging.info("Captioning {} batches, {} samples.".format(nb_batch, nb_val))
 
@@ -145,7 +155,7 @@ def save_final_captions(args, model, val_loader, max_sent_len, beam_width):
         for i, (image_ids, features, captions, lengths) in enumerate(val_loader):
             if torch.cuda.is_available():
                 features = features.cuda()
-            sentence = model(features, max_sent_len, beam_width)
+            sentence = model(features, max_sent_len, captions, beam_width)
             s.add_sentence(image_ids[0], sentence[1])
             if (i % 50) == 0:
                 logging.info("  {:4d}".format(i))
@@ -154,11 +164,18 @@ def save_final_captions(args, model, val_loader, max_sent_len, beam_width):
     logging.info("Done.")
 
 
-def train(args, model, train_loader, val_loader, len_vocab):
+def train(args, model, train_loader, val_loader, optimizer, scheduler, len_vocab):
     logging.warning("Beginning training")
-    optimizer = None
 
+    train_loss_array = []
+    val_loss_array = []
 
+    #some big number
+    min_val_loss = 10000000
+
+    train_epoch_array = []
+    val_epoch_array = []
+    
     if args.current_epoch == 0:
         val_loss = val_one_epoch(args,model,val_loader, optimizer, len_vocab, beam=None)
         logging.info("Validation loss with random initialization: " + str(val_loss))
@@ -172,11 +189,12 @@ def train(args, model, train_loader, val_loader, len_vocab):
         
         t0=time.time()
         train_loss = train_one_epoch(args, model, train_loader, optimizer, len_vocab)
+
         logging.info("Train done in: {:3.1f} seconds".format(time.time() - t0))
         
         t0 = time.time()
         val_loss = val_one_epoch(args,model,val_loader, optimizer, len_vocab, beam=None)
-    
+        scheduler.step(val_loss)
         logging.info("Valid done in: {:3.1f} seconds".format(time.time() - t0))
 
         torch.save({
@@ -211,9 +229,11 @@ def train(args, model, train_loader, val_loader, len_vocab):
 
 def create_model(args, vocab, feature_dim):
     model = None
+    #teacher_forcing ratio
+    tf_ratio = 0.5
     
     model = Caption_Model(dict_size=len(vocab),
-                            image_feature_dim=feature_dim, vocab=vocab)
+                            image_feature_dim=feature_dim, vocab=vocab, tf_ratio=tf_ratio)
     
     if args.resume_epoch > 0:
         logging.info('Loading checkpoint')
@@ -277,7 +297,7 @@ def main():
 
     test_loader = get_loader(data_root=args.root_dir,
                               vocab=vocab,
-                              batch_size=args.batch_size,
+                              batch_size=1,
                               data_type='test',
                               shuffle=False,
                               num_workers=0,
@@ -290,6 +310,7 @@ def main():
         logging.info("GPU type:\n{}".format(torch.cuda.get_device_name(0)))
 
     print("args.opt: " + args.opt)
+    optimizer = None
     if args.opt == "Adam":
         optimizer = optim.Adam(model.parameters(), lr=args.lr)
     elif args.opt == "SGD":
@@ -300,23 +321,14 @@ def main():
         optimizer.load_state_dict(args.checkpoint['optimizer_state_dict'])
         scheduler.load_state_dict(args.checkpoint['scheduler_state_dict'])
 
-    train_loss_array = []
-    val_loss_array = []
-
-    #some big number
-    min_val_loss = 10000000
-
-    train_epoch_array = []
-    val_epoch_array = []
 
     logging.info(model)
-    train(args, model, train_loader, val_loader, len(vocab))
+    train(args, model, train_loader, val_loader, optimizer, scheduler, len(vocab))
 
     t0 = time.time()
-    test_loss = test(args,model,test_loader, len(vocab), beam=None)
+    test_loss = test(args,model,test_loader, len(vocab), beam=5)
     logging.info("Testing done in: {:3.1f} seconds".format(time.time() - t0))
-    
-    #save_final_captions(args, model, test_loader, max_sent_len=12, beam_width=5)
+    save_final_captions(args, model, test_loader, max_sent_len=12, beam_width=5)
 
 if __name__ == "__main__":
     main()

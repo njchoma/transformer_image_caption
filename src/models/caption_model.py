@@ -1,12 +1,12 @@
 import heapq
 from copy import deepcopy
 from math import log
-
+import random
 import torch
 import torch.nn as nn
 
 from data_helpers import vocab
-from data_helpers import data_loader
+from data_helpers import data_loader_ks as data_loader
 import models.utils_models as utils
 
 
@@ -23,7 +23,7 @@ NB_HIDDEN_ATT   = 512
 #               MAIN MODEL              #
 #########################################
 class Caption_Model(nn.Module):
-    def __init__(self, dict_size, image_feature_dim, vocab):
+    def __init__(self, dict_size, image_feature_dim, vocab, tf_ratio):
         super(Caption_Model, self).__init__()
         self.dict_size = dict_size
         self.image_feature_dim = image_feature_dim
@@ -41,8 +41,9 @@ class Caption_Model(nn.Module):
                                           NB_HIDDEN_ATT)
         self.predict_word = Predict_Word(NB_HIDDEN_LSTM2, dict_size)
         self.vocab = vocab
+        self.teacher_forcing_ratio = tf_ratio
     
-    def forward(self, image_features, nb_timesteps, beam=None):
+    def forward(self, image_features, nb_timesteps, true_words, beam=None):
         if beam is not None:
             return self.beam_search(image_features, nb_timesteps, beam)
 
@@ -55,12 +56,30 @@ class Caption_Model(nn.Module):
                                  cuda = image_features.is_cuda)
 
         for t in range(nb_timesteps-1):
+            #print("Time step: " + str(t))
+            #print(current_word.shape)
             word_emb = self.embed_word(current_word)
             h1, c1 = self.lstm1(h1, c1, h2, v_mean, word_emb)
             v_hat = self.attention(image_features,h1)
             h2, c2 = self.lstm2(h2, c2, h1, v_hat)
             y = self.predict_word(h2)
             y_out[:,t,:] = y
+            
+            use_teacher_forcing = True if random.random() < self.teacher_forcing_ratio else False
+            
+            if use_teacher_forcing:
+                #print('using tf')
+                current_word = data_loader.indexto1hot(len(self.vocab), true_words[:,t+1])
+            else:
+                #print('not using tf')
+                current_word = data_loader.indexto1hot(len(self.vocab), torch.argmax(y, dim=1))
+            current_word = torch.from_numpy(current_word).float()
+            
+            if image_features.is_cuda:
+                current_word = current_word.cuda()
+
+            if not use_teacher_forcing:
+                current_word = current_word.detach()
 
         return y_out
 

@@ -62,7 +62,7 @@ def test(args, model, test_loader, len_vocab, beam=None):
     logging.info("Test loss: " + str(epoch_loss))
     return epoch_loss
 
-def save_final_captions(args, model, val_loader, max_sent_len, beam_width):
+def save_final_captions(args, model, val_loader, vocab, max_sent_len, beam_width=None):
     nb_batch = len(val_loader)
     nb_val = nb_batch * args.batch_size
     assert nb_batch == nb_val # Must be equal for beam search
@@ -75,7 +75,44 @@ def save_final_captions(args, model, val_loader, max_sent_len, beam_width):
             if torch.cuda.is_available():
                 features = features.cuda()
             sentence = model(features, max_sent_len, beam_width)
-            s.add_sentence(image_ids[0], sentence[1])
+            prev_word_id = -1
+            prev_word_ids = []
+            if beam_width == None:
+                sentence = sentence.squeeze()
+                #sentence = [ vocab.get_word(torch.nonzero(onehotarray)[0][0]) for onehotarray in sentence]
+                sentence1 = []
+                correct_sentence = []
+                #print(captions)
+                #print(captions[0])
+                for i in range((len(captions[0]))):
+                    correct_sentence.append(vocab.get_word(captions[0][i].item()))
+                for i in range(len(sentence)):
+                    curr_word_id = torch.argmax(sentence[i]).item()
+                    
+                    """
+                    if curr_word_id == prev_word_id:
+                        _, indices = torch.topk(sentence[i],2)
+                        second_max_index = indices[1]
+                        curr_word_id = second_max_index.item()
+                    """
+                    if curr_word_id in prev_word_ids:
+                        _,indices = torch.topk(sentence[i],20)
+                        top_count = 0
+                        while curr_word_id in prev_word_ids:
+                            top_count += 1
+                            curr_word_id = indices[top_count].item()
+                            
+                    
+                    sentence1.append(vocab.get_word(curr_word_id))
+                    #prev_word_id = curr_word_id
+                    prev_word_ids.append(curr_word_id)
+                print("Correct sentence: ")
+                print(correct_sentence)
+                print("Predicted: ")
+                print(sentence1)
+                s.add_sentence(image_ids[0], sentence1)
+            else:
+                s.add_sentence(image_ids[0], sentence[1])
             if (i % 50) == 0:
                 logging.info("  {:4d}".format(i))
     logging.info("Saving sentences...")
@@ -145,7 +182,8 @@ def main():
 
     t0 = time.time()
     
-    save_final_captions(args, model, test_loader, max_sent_len=12, beam_width=5)
+    save_final_captions(args, model, test_loader, vocab, max_sent_len=12)
+    #save_final_captions(args, model, test_loader, vocab, max_sent_len=12, beam_width=5)
     test_loss = test(args,model,test_loader, len(vocab), beam=None)
     logging.info("Testing done in: {:3.1f} seconds".format(time.time() - t0))
 

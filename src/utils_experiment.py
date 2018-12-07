@@ -60,7 +60,8 @@ def load_args(experiment_dir, args_file):
 class Sentences(object):
     def __init__(self, savedir):
         self.sentences = []
-        os.makedirs(savedir, exist_ok=True)
+        if os.path.exists(savedir) == False:
+            os.makedirs(savedir)
         self.filepath = os.path.join(savedir, "final_sentences.json")
 
     def add_sentence(self, image_id, sentence):

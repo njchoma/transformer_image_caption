@@ -107,9 +107,19 @@ class CocoDataset(data.Dataset):
         return len(self.ids)
 
 def indexto1hot(vocab_len, index):
-    one_hot = np.zeros([vocab_len])
-    one_hot[index] = 1
-    return one_hot
+    #print("index type: ")
+    if isinstance(index,int) == False:
+        n = len(index)
+        #print("making a 1hot encoding of shape: " + str(n) + "," + str(vocab_len) )
+        one_hot = np.zeros([n,vocab_len])
+        #can this be optimized?
+        for i in range(n):
+            one_hot[i,index[i]]=1
+        return one_hot
+    else:
+        one_hot = np.zeros([vocab_len])
+        one_hot[index] = 1
+        return one_hot
 
 def collate_fn(data):
     """Creates mini-batch tensors from the list of tuples (image, caption).
