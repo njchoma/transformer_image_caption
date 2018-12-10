@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import torch
 import torch.optim as optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.nn.utils.rnn import pack_padded_sequence
 
 import utils_experiment as utils
 from data_helpers.data_loader_ks import get_loader
@@ -47,9 +48,9 @@ def train_one_epoch(args, model, train_loader, optimizer, len_vocab):
         len_captions = len(captions[0])
         if torch.cuda.is_available():
             features, captions = features.cuda(), captions.cuda()
-
+        #print(captions)
         out = model(features, len_captions, captions)
-        #print(out)
+        #print(torch.argmax(out, dim=2))
         n_ex, vocab_len = out.view(-1, len_vocab).shape
         #print(n_ex)
         #print(vocab_len)
@@ -58,9 +59,16 @@ def train_one_epoch(args, model, train_loader, optimizer, len_vocab):
         #nonzeros = torch.nonzero(captions[:,1:,:])        
         #print(nonzeros.shape)
         #caption_indices = captions[:,1:,:] == 1
-        
-        batch_loss = loss(out.view(-1,len_vocab),captions.contiguous().view(1, n_ex).squeeze())
-        #print(str(batch_loss.item()) + "\n")
+        #print("captions shape")
+        #print(captions.shape)
+        #targets = captions.contiguous().view(1, n_ex).squeeze()
+        #print("outputs shape")
+        #print(out.shape)
+        #scores = out.view(-1,len_vocab)
+        decode_lengths = [x-1 for x in lengths]
+        captions,_ = pack_padded_sequence(captions, decode_lengths, batch_first=True)
+        out,_ = pack_padded_sequence(out, decode_lengths,batch_first = True)
+        batch_loss = loss(out,captions)
         epoch_loss+=batch_loss.item()
 
         optimizer.zero_grad()
@@ -95,7 +103,12 @@ def val_one_epoch(args, model, val_loader, optimizer, len_vocab, beam=None):
             out = model(features, len_captions, captions)
             n_ex, vocab_len = out.view(-1, len_vocab).shape
             captions = captions[:,1:]
-            batch_loss = loss(out.view(-1,len_vocab),captions.contiguous().view(1, n_ex).squeeze())
+            
+
+            decode_lengths = [x-1 for x in lengths]
+            captions,_ = pack_padded_sequence(captions, decode_lengths, batch_first=True)
+            out,_ = pack_padded_sequence(out, decode_lengths,batch_first = True)
+            batch_loss = loss(out,captions)
             epoch_loss+=batch_loss.item()
    
     epoch_loss = epoch_loss/nb_batch
@@ -131,10 +144,18 @@ def test(args, model, test_loader, len_vocab, beam=None):
                 if (i % (nb_batch//2)) == 0:
                     sentences = model(features[0:1], 20, captions, beam)
                     print(sentences)
+            
             out = model(features, len_captions, captions)
+            #print("caption:")
+            #print(captions)
+            #print("output:")
+            #print(torch.argmax(out, dim=2))
             n_ex, vocab_len = out.view(-1, len_vocab).shape
             captions = captions[:,1:]
-            batch_loss = loss(out.view(-1,len_vocab),captions.contiguous().view(1, n_ex).squeeze())
+            decode_lengths = [x-1 for x in lengths]
+            captions,_ = pack_padded_sequence(captions, decode_lengths, batch_first=True)
+            out,_ = pack_padded_sequence(out, decode_lengths,batch_first = True)
+            batch_loss = loss(out,captions)
             epoch_loss+=batch_loss.item()
    
     epoch_loss = epoch_loss/nb_batch
@@ -182,7 +203,7 @@ def train(args, model, train_loader, val_loader, optimizer, scheduler, len_vocab
     train_epoch_array = []
     val_epoch_array = []
     
-    if args.current_epoch == 0:
+    if args.current_epoch == 0 and args.debug == False:
         val_loss = val_one_epoch(args,model,val_loader, optimizer, len_vocab, beam=None)
         logging.info("Validation loss with random initialization: " + str(val_loss))
     
@@ -301,9 +322,12 @@ def main():
                               debug=False)
     logging.info("Val loader ready")
 
+    test_batch_size = args.batch_size
+    if args.beam_search:
+        test_batch_size = 1
     test_loader = get_loader(data_root=args.root_dir,
                               vocab=vocab,
-                              batch_size=1 if args.beam_search else args.batch_size,
+                              batch_size= test_batch_size,
                               data_type='test',
                               shuffle=False,
                               num_workers=0,
@@ -332,8 +356,8 @@ def main():
     train(args, model, train_loader, val_loader, optimizer, scheduler, len(vocab))
 
     t0 = time.time()
-    #test_loss = test(args,model,test_loader, len(vocab))
-    #logging.info("Testing done in: {:3.1f} seconds".format(time.time() - t0))
+    test_loss = test(args,model,test_loader, len(vocab), beam = 5)
+    logging.info("Testing done in: {:3.1f} seconds".format(time.time() - t0))
     if args.beam_search:
         save_final_captions(args, model, test_loader, max_sent_len=12, beam_width = 5)
 
