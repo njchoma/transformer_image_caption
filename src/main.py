@@ -105,18 +105,20 @@ def val_one_epoch(args, model, val_loader, optimizer, len_vocab, beam=None):
 def test(args, model, test_loader, len_vocab, beam=None):
     model.eval()
     nb_batch = len(test_loader)
-
-    if beam != None:
+    
+    if beam is not None:
         batch_size = 1
     else:
         batch_size = args.batch_size
-
+    logging.info("Batch size for testing: " + str(batch_size))
     nb_test = nb_batch * batch_size
     logging.info("Testing {} batches, {} samples.".format(nb_batch, nb_test))
 
     loss = torch.nn.CrossEntropyLoss()
     
     epoch_loss = 0
+    model.eval()
+    model.teacher_forcing_ratio = 0
 
     with torch.no_grad():
         for i, (image_ids, features, captions, lengths) in enumerate(test_loader):
@@ -141,22 +143,26 @@ def test(args, model, test_loader, len_vocab, beam=None):
 
 def save_final_captions(args, model, val_loader, max_sent_len, beam_width):
     nb_batch = len(val_loader)
-    if beam_width != None:
+    if beam_width is not None:
         batch_size = 1
     else:
         batch_size = args.batch_size
     nb_val = nb_batch * batch_size
-    assert nb_batch == nb_val # Must be equal for beam search
+    #assert nb_batch == nb_val # Must be equal for beam search
     logging.info("Captioning {} batches, {} samples.".format(nb_batch, nb_val))
 
     s = utils.Sentences(args.experiment_dir)
     model.eval()
+    model.teacher_forcing_ratio = 0
     with torch.no_grad():
         for i, (image_ids, features, captions, lengths) in enumerate(val_loader):
             if torch.cuda.is_available():
                 features = features.cuda()
             sentence = model(features, max_sent_len, captions, beam_width)
-            s.add_sentence(image_ids[0], sentence[1])
+            #print(sentence)
+            if beam_width is not None:
+                sentence = sentence[1]
+            s.add_sentence(image_ids[0], sentence)
             if (i % 50) == 0:
                 logging.info("  {:4d}".format(i))
     logging.info("Saving sentences...")
@@ -297,7 +303,7 @@ def main():
 
     test_loader = get_loader(data_root=args.root_dir,
                               vocab=vocab,
-                              batch_size=1,
+                              batch_size=1 if args.beam_search else args.batch_size,
                               data_type='test',
                               shuffle=False,
                               num_workers=0,
@@ -326,9 +332,10 @@ def main():
     train(args, model, train_loader, val_loader, optimizer, scheduler, len(vocab))
 
     t0 = time.time()
-    test_loss = test(args,model,test_loader, len(vocab), beam=5)
-    logging.info("Testing done in: {:3.1f} seconds".format(time.time() - t0))
-    save_final_captions(args, model, test_loader, max_sent_len=12, beam_width=5)
+    #test_loss = test(args,model,test_loader, len(vocab))
+    #logging.info("Testing done in: {:3.1f} seconds".format(time.time() - t0))
+    if args.beam_search:
+        save_final_captions(args, model, test_loader, max_sent_len=12, beam_width = 5)
 
 if __name__ == "__main__":
     main()
