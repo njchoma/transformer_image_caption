@@ -181,8 +181,10 @@ def save_final_captions(args, model, val_loader, max_sent_len, beam_width):
                 features = features.cuda()
             sentence = model(features, max_sent_len, captions, beam_width)
             #print(sentence)
+            #print(1/0)
             if beam_width is not None:
                 sentence = sentence[1]
+            
             s.add_sentence(image_ids[0], sentence)
             if (i % 50) == 0:
                 logging.info("  {:4d}".format(i))
@@ -356,8 +358,8 @@ def main():
     train(args, model, train_loader, val_loader, optimizer, scheduler, len(vocab))
 
     t0 = time.time()
-    test_loss = test(args,model,test_loader, len(vocab), beam = 5)
-    logging.info("Testing done in: {:3.1f} seconds".format(time.time() - t0))
+    #test_loss = test(args,model,test_loader, len(vocab), beam = 5)
+    #logging.info("Testing done in: {:3.1f} seconds".format(time.time() - t0))
     if args.beam_search:
         save_final_captions(args, model, test_loader, max_sent_len=12, beam_width = 5)
 
