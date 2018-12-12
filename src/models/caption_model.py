@@ -42,6 +42,11 @@ class Caption_Model(nn.Module):
         self.predict_word = Predict_Word(NB_HIDDEN_LSTM2, dict_size)
         self.vocab = vocab
         self.teacher_forcing_ratio = tf_ratio
+
+        self.h1 = torch.nn.Parameter(torch.zeros(1, NB_HIDDEN_LSTM1))
+        self.c1 = torch.nn.Parameter(torch.zeros(1, NB_HIDDEN_LSTM1))
+        self.h2 = torch.nn.Parameter(torch.zeros(1, NB_HIDDEN_LSTM2))
+        self.c2 = torch.nn.Parameter(torch.zeros(1, NB_HIDDEN_LSTM2))
     
     def forward(self, image_features, nb_timesteps, true_words, beam=None):
         if beam is not None:
@@ -50,14 +55,11 @@ class Caption_Model(nn.Module):
         nb_batch, nb_image_feats, _ = image_features.size()
         v_mean = image_features.mean(dim=1)
         #print(v_mean.shape)
-        h1, c1, h2, c2, current_word = self.init_inference(nb_batch,
-                                                       image_features.is_cuda)
+        h1, c1, h2, c2, current_word = self.init_inference(nb_batch, image_features.is_cuda)
         y_out = utils.make_zeros((nb_batch, nb_timesteps-1, self.dict_size),
                                  cuda = image_features.is_cuda)
 
         for t in range(nb_timesteps-1):
-            #print("Time step: " + str(t))
-            #print(current_word.shape)
             word_emb = self.embed_word(current_word)
             h1, c1 = self.lstm1(h1, c1, h2, v_mean, word_emb)
             v_hat = self.attention(image_features,h1)
@@ -94,15 +96,13 @@ class Caption_Model(nn.Module):
         #print(start_word.shape)    
 
         if cuda:
-            t = torch.cuda
             start_word = start_word.cuda()
-        else:
-            t = torch
 
-        h1 = t.FloatTensor(nb_batch, NB_HIDDEN_LSTM1)
-        c1 = t.FloatTensor(nb_batch, NB_HIDDEN_LSTM1)
-        h2 = t.FloatTensor(nb_batch, NB_HIDDEN_LSTM2)
-        c2 = t.FloatTensor(nb_batch, NB_HIDDEN_LSTM2)
+        h1 = self.h1.repeat(nb_batch, 1)
+        c1 = self.c1.repeat(nb_batch, 1)
+        h2 = self.h2.repeat(nb_batch, 1)
+        c2 = self.c2.repeat(nb_batch, 1)
+
         return h1, c1, h2, c2, start_word
 
 
@@ -338,3 +338,8 @@ class Predict_Word(nn.Module):
     def forward(self, h2):
         y = self.fc(h2)
         return y
+
+def test_for_nan(x, name="No name given"):
+    if torch.isnan(x).sum() > 0:
+        print("{} has NAN".format(name))
+        exit()
