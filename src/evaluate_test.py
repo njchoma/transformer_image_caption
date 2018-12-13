@@ -33,7 +33,7 @@ def test(args, model, val_loader, len_vocab, beam=None):
     model.eval()
     nb_batch = len(val_loader)
     nb_val = nb_batch * args.batch_size
-    logging.info("Validating {} batches, {} samples.".format(nb_batch, nb_val))
+    logging.info("Testing {} batches, {} samples.".format(nb_batch, nb_val))
 
     loss = torch.nn.CrossEntropyLoss()
     epoch_loss = 0
@@ -62,7 +62,7 @@ def test(args, model, val_loader, len_vocab, beam=None):
             epoch_loss+=batch_loss.item()
    
     epoch_loss = epoch_loss/nb_batch
-    logging.info("Val loss: {:>.3E}".format(epoch_loss))
+    logging.info("Test loss: {:>.3E}".format(epoch_loss))
     return epoch_loss
 
 def save_final_captions(args, model, val_loader, max_sent_len, beam_width):
@@ -79,7 +79,7 @@ def save_final_captions(args, model, val_loader, max_sent_len, beam_width):
                 features = features.cuda()
             sentence = model(features, max_sent_len, None, beam_width)
             s.add_sentence(image_ids[0], sentence[1])
-            if (i % 50) == 0:
+            if (i % 500) == 0:
                 logging.info("  {:4d}".format(i))
     logging.info("Saving sentences...")
     s.save_sentences()

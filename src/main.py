@@ -260,8 +260,13 @@ def main():
     optimizer = None
     if args.opt == "Adam":
         optimizer = optim.Adam(model.parameters(), lr=args.lr)
+        logging.info("Optimizing with Adam")
     elif args.opt == "SGD":
-        optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum = 0.899999976158, weight_decay=0.000500000023749)
+        optimizer = optim.SGD(model.parameters(),
+                              lr=args.lr,
+                              momentum = 0.899999976158,
+                              weight_decay=0.000500000023749)
+        logging.info("Optimizing with SGD")
     scheduler = ReduceLROnPlateau(optimizer, 'min')
 
     if args.resume_epoch > 0:
@@ -269,7 +274,13 @@ def main():
         scheduler.load_state_dict(args.checkpoint['scheduler_state_dict'])
 
     logging.info(model)
-    train(args, model, train_loader, val_loader, optimizer, scheduler, len(vocab))
+    train(args,
+          model,
+          train_loader,
+          val_loader,
+          optimizer,
+          scheduler,
+          len(vocab))
 
 if __name__ == "__main__":
     main()
