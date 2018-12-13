@@ -57,4 +57,4 @@ cocoEval.evaluate(gt_path, results_path)
 
 # print output evaluation scores
 #for metric, score in cocoEval.eval.items():
-#    print '%s: %.3f'%(metric, score)
+    #print '%s: %.3f'%(metric, score)

@@ -259,15 +259,23 @@ def train(args, model, train_loader, val_loader, optimizer, scheduler, len_vocab
 def create_model(args, vocab, feature_dim):
     model = None
     #teacher_forcing ratio
-    tf_ratio = 0.5
+    tf_ratio = args.teacher_forcing
     
     model = Caption_Model(dict_size=len(vocab),
                             image_feature_dim=feature_dim, vocab=vocab, tf_ratio=tf_ratio)
     
     if args.resume_epoch > 0:
         logging.info('Loading checkpoint')
-        args.checkpoint = torch.load(os.path.join(args.experiment_dir, "epoch_" + str(args.resume_epoch) + ".pth.tar" ))
-        model.load_state_dict(args.checkpoint['model_state_dict'])
+        
+        if torch.cuda.is_available():
+            args.checkpoint = torch.load(os.path.join(args.experiment_dir, "epoch_" + str(args.resume_epoch) + ".pth.tar" ))
+            model.load_state_dict(args.checkpoint['model_state_dict'])
+        else:
+            args.checkpoint = torch.load(os.path.join(args.experiment_dir, "epoch_" + str(args.resume_epoch) + ".pth.tar" ), 
+                                        map_location = lambda storage, location: 'cpu')
+            model.load_state_dict(args.checkpoint['model_state_dict'])
+
+
         args.current_epoch = args.resume_epoch
     elif args.resume_epoch < 0:
         logging.info('Loading best checkpoint')

@@ -61,6 +61,17 @@ class Caption_Model(nn.Module):
 
         for t in range(nb_timesteps-1):
             word_emb = self.embed_word(current_word)
+            print("h1: ")
+            print(h1)
+            print("c1: ")
+            print(c1)
+            print("h2: ")
+            print(h2)
+            print("v _mean: ")
+            print(v_mean)
+            print("word_emb: ")
+            print(word_emb)
+            exit()
             h1, c1 = self.lstm1(h1, c1, h2, v_mean, word_emb)
             v_hat = self.attention(image_features,h1)
             h2, c2 = self.lstm2(h2, c2, h1, v_hat)

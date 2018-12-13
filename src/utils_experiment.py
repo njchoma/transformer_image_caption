@@ -35,6 +35,9 @@ def read_args():
             help='Learning rate')
     add_arg('--opt', type=str, default="Adam",
             help='Optimization method')
+    add_arg('--teacher_forcing', type=float, default=0,
+            help='teacher forcing ratio')
+    
 
     return parser.parse_args()
 
@@ -69,8 +72,8 @@ class Sentences(object):
     def add_sentence(self, image_id, sentence):
         caption = ' '.join(sentence[1:-1])
         s = {'image_id':image_id, 'caption':caption}
-        print("appending: ")
-        print(s)
+        #print("appending: ")
+        #print(s)
         self.sentences.append(s)
 
     def save_sentences(self):
