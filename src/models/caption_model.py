@@ -27,6 +27,8 @@ class Caption_Model(nn.Module):
         super(Caption_Model, self).__init__()
         self.dict_size = dict_size
         self.image_feature_dim = image_feature_dim
+        self.vocab = vocab
+        self.tf_ratio = tf_ratio
 
         self.embed_word = nn.Linear(dict_size, WORD_EMB_DIM, bias=False)
         self.lstm1 = Attention_LSTM(WORD_EMB_DIM,
@@ -40,8 +42,6 @@ class Caption_Model(nn.Module):
                                           NB_HIDDEN_LSTM1,
                                           NB_HIDDEN_ATT)
         self.predict_word = Predict_Word(NB_HIDDEN_LSTM2, dict_size)
-        self.vocab = vocab
-        self.tf_ratio = tf_ratio
 
         self.h1 = torch.nn.Parameter(torch.zeros(1, NB_HIDDEN_LSTM1))
         self.c1 = torch.nn.Parameter(torch.zeros(1, NB_HIDDEN_LSTM1))
@@ -85,27 +85,21 @@ class Caption_Model(nn.Module):
     def update_current_word(self, y, true_words, t, cuda):
         use_tf = True if random.random() < self.tf_ratio else False
         if use_tf:
-            current_word = data_loader.indexto1hot(len(self.vocab),
-                                                   true_words[:,t+1])
+            next_word = true_words[:,t+1]
         else:
-            current_word = data_loader.indexto1hot(len(self.vocab),
-                                                   torch.argmax(y, dim=1))
+            next_word = torch.argmax(y, dim=1)
+
+        current_word = data_loader.indexto1hot(len(self.vocab), next_word)
         current_word = torch.from_numpy(current_word).float()
         
         if cuda:
             current_word = current_word.cuda()
         return current_word
 
-
     def init_inference(self, nb_batch, cuda):
         start_word = data_loader.indexto1hot(len(self.vocab), self.vocab('<start>'))
         start_word = torch.from_numpy(start_word).float().unsqueeze(0)
-        #print(start_word.shape)
-        copy = start_word.clone()
-        for i in range(nb_batch-1):
-            copy = copy.clone()
-            start_word = torch.cat((start_word,copy),0)
-        #print(start_word.shape)    
+        start_word = start_word.repeat(nb_batch, 1)
 
         if cuda:
             start_word = start_word.cuda()
@@ -114,16 +108,21 @@ class Caption_Model(nn.Module):
         c1 = self.c1.repeat(nb_batch, 1)
         h2 = self.h2.repeat(nb_batch, 1)
         c2 = self.c2.repeat(nb_batch, 1)
+        state = [h1, c1, h2, c2]
 
-        return [h1, c1, h2, c2], start_word
+        return state, start_word
 
-
+    #########################################
+    #               BEAM SEARCH             #
+    #########################################
     def beam_search(self, image_features, max_nb_words, beam_width):
         # Initialize model
+        use_cuda = image_features.is_cuda
         nb_batch, nb_image_feats, _ = image_features.size()
+
         v_mean = image_features.mean(dim=1)
-        state, current_word = self.init_inference(nb_batch,
-                                                       image_features.is_cuda)
+        state, current_word = self.init_inference(nb_batch, use_cuda)
+
         # Initialize beam search
         end_word = data_loader.indexto1hot(len(self.vocab), self.vocab('<end>'))
         end_word = torch.from_numpy(end_word).float().unsqueeze(0)
@@ -137,17 +136,18 @@ class Caption_Model(nn.Module):
         final_beam = Beam(beam_width)
         while len(beam) > 0:
             s = beam.pop()
-            new_s = self.update_states(s, image_features, v_mean)
-            for s in new_s:
+            new_sentences = self.update_states(s, image_features, v_mean)
+            for s in new_sentences:
                 if s.ended:
                     final_beam.push(s)
                 else:
                     beam.push(s)
-            beam.trim()
+            # Get rid of low scoring sentences
+            beam.trim() 
             final_beam.trim()
 
         # Extract final sentence
-        s = final_beam.pop()
+        s = final_beam.pop() # Best sentence on top of heap
         sentence = s.extract_sentence()
         
         return sentence
@@ -156,9 +156,8 @@ class Caption_Model(nn.Module):
         state, current_word = s.get_states()
         y, state = self.forward_one_step(state, current_word, v_mean, image_feats)
         y = self.remove_consecutive_words(y, current_word)
-
-        new_s = s.update_words(s, y)
-        return new_s
+        new_sentences = s.update_words(s, state, y)
+        return new_sentences
 
     def remove_consecutive_words(self, y, prev_word):
         # give previous word low score so as not to repeat words
@@ -172,11 +171,13 @@ class Sentence(object):
     def __init__(self, max_nb_words, beam_width, end_word, vocab):
         self.max_nb_words = max_nb_words
         self.beam_width = beam_width
+        self.end_word = end_word
+        self.vocab = vocab
+
         self.words = []
         self.probability = 0
-        self.end_word = end_word
         self.ended = False
-        self.vocab = vocab
+
         self.act = nn.Softmax(dim=1)
 
     def update_words(self, s, state, y):
@@ -196,8 +197,7 @@ class Sentence(object):
         return new_s
 
     def update_state(self, p, state, current_word):
-        copy_state = [s.clone() for s in state]
-        self.state = copy_state
+        self.state = [s.clone() for s in state]
         self.words.append(current_word)
         self._update_probability(p)
         self._update_finished()
@@ -239,9 +239,6 @@ class Sentence(object):
             idx = w.max(1)[1].item()
             s += "{}, ".format(self.vocab.get_word(idx))
         return s
-    
-
-
 
 
 class Beam(object):

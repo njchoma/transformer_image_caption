@@ -149,7 +149,7 @@ def main():
 
     t0 = time.time()
     
-    # save_final_captions(args, model, test_loader, max_sent_len=12, beam_width=5)
+    save_final_captions(args, model, test_loader, max_sent_len=12, beam_width=5)
     test_loss = test(args, model, test_loader, len(vocab), beam=None)
     logging.info("Testing done in: {:3.1f} seconds".format(time.time() - t0))
 
