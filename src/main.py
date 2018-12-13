@@ -44,30 +44,20 @@ def train_one_epoch(args, model, train_loader, optimizer, len_vocab):
     
     epoch_loss = 0
     for i, (image_ids, features, captions, lengths) in enumerate(train_loader):
-        #print(i)
         len_captions = len(captions[0])
         if torch.cuda.is_available():
             features, captions = features.cuda(), captions.cuda()
-        #print(captions)
+
         out = model(features, len_captions, captions)
-        #print(torch.argmax(out, dim=2))
         n_ex, vocab_len = out.view(-1, len_vocab).shape
-        #print(n_ex)
-        #print(vocab_len)
+
         captions = captions[:,1:]
-        #print(captions.contiguous().view(1,n_ex).squeeze().shape)
-        #nonzeros = torch.nonzero(captions[:,1:,:])        
-        #print(nonzeros.shape)
-        #caption_indices = captions[:,1:,:] == 1
-        #print("captions shape")
-        #print(captions.shape)
-        #targets = captions.contiguous().view(1, n_ex).squeeze()
-        #print("outputs shape")
-        #print(out.shape)
-        #scores = out.view(-1,len_vocab)
         decode_lengths = [x-1 for x in lengths]
-        captions,_ = pack_padded_sequence(captions, decode_lengths, batch_first=True)
+        captions,_ = pack_padded_sequence(captions,
+                                          decode_lengths,
+                                          batch_first=True)
         out,_ = pack_padded_sequence(out, decode_lengths,batch_first = True)
+
         batch_loss = loss(out,captions)
         epoch_loss+=batch_loss.item()
 
@@ -79,7 +69,7 @@ def train_one_epoch(args, model, train_loader, optimizer, len_vocab):
     logging.info("Train loss: {:>.3E}".format(epoch_loss))
     return epoch_loss
 
-def val_one_epoch(args, model, val_loader, optimizer, len_vocab, beam=None):
+def val_one_epoch(args, model, val_loader, len_vocab, beam=None):
     model.eval()
     nb_batch = len(val_loader)
     nb_val = nb_batch * args.batch_size
@@ -91,7 +81,6 @@ def val_one_epoch(args, model, val_loader, optimizer, len_vocab, beam=None):
 
     with torch.no_grad():
         for i, (image_ids, features, captions, lengths) in enumerate(val_loader):
-        #print(i)
             len_captions = len(captions[0])
             if torch.cuda.is_available():
                 features, captions = features.cuda(), captions.cuda()
@@ -100,13 +89,15 @@ def val_one_epoch(args, model, val_loader, optimizer, len_vocab, beam=None):
                 if (i % 200) == 0:
                     sentences = model(features, 20, beam)
                     print(sentences)
+
             out = model(features, len_captions, captions)
             n_ex, vocab_len = out.view(-1, len_vocab).shape
             captions = captions[:,1:]
-            
 
             decode_lengths = [x-1 for x in lengths]
-            captions,_ = pack_padded_sequence(captions, decode_lengths, batch_first=True)
+            captions,_ = pack_padded_sequence(captions,
+                                              decode_lengths,
+                                              batch_first=True)
             out,_ = pack_padded_sequence(out, decode_lengths,batch_first = True)
             batch_loss = loss(out,captions)
             epoch_loss+=batch_loss.item()
@@ -115,84 +106,6 @@ def val_one_epoch(args, model, val_loader, optimizer, len_vocab, beam=None):
     logging.info("Val loss: {:>.3E}".format(epoch_loss))
     return epoch_loss
 
-def test(args, model, test_loader, len_vocab, beam=None):
-    model.eval()
-    nb_batch = len(test_loader)
-    
-    if beam is not None:
-        batch_size = 1
-    else:
-        batch_size = args.batch_size
-    logging.info("Batch size for testing: " + str(batch_size))
-    nb_test = nb_batch * batch_size
-    logging.info("Testing {} batches, {} samples.".format(nb_batch, nb_test))
-
-    loss = torch.nn.CrossEntropyLoss()
-    
-    epoch_loss = 0
-    model.eval()
-    model.teacher_forcing_ratio = 0
-
-    with torch.no_grad():
-        for i, (image_ids, features, captions, lengths) in enumerate(test_loader):
-        #print(i)
-            len_captions = len(captions[0])
-            if torch.cuda.is_available():
-                features, captions = features.cuda(), captions.cuda()
-
-            if beam is not None:
-                if (i % (nb_batch//2)) == 0:
-                    sentences = model(features[0:1], 20, captions, beam)
-                    print(sentences)
-            
-            out = model(features, len_captions, captions)
-            #print("caption:")
-            #print(captions)
-            #print("output:")
-            #print(torch.argmax(out, dim=2))
-            n_ex, vocab_len = out.view(-1, len_vocab).shape
-            captions = captions[:,1:]
-            decode_lengths = [x-1 for x in lengths]
-            captions,_ = pack_padded_sequence(captions, decode_lengths, batch_first=True)
-            out,_ = pack_padded_sequence(out, decode_lengths,batch_first = True)
-            batch_loss = loss(out,captions)
-            epoch_loss+=batch_loss.item()
-   
-    epoch_loss = epoch_loss/nb_batch
-    logging.info("Test loss: " + str(epoch_loss))
-    return epoch_loss
-
-def save_final_captions(args, model, val_loader, max_sent_len, beam_width):
-    nb_batch = len(val_loader)
-    if beam_width is not None:
-        batch_size = 1
-    else:
-        batch_size = args.batch_size
-    nb_val = nb_batch * batch_size
-    #assert nb_batch == nb_val # Must be equal for beam search
-    logging.info("Captioning {} batches, {} samples.".format(nb_batch, nb_val))
-
-    s = utils.Sentences(args.experiment_dir)
-    model.eval()
-    model.teacher_forcing_ratio = 0
-    with torch.no_grad():
-        for i, (image_ids, features, captions, lengths) in enumerate(val_loader):
-            if torch.cuda.is_available():
-                features = features.cuda()
-            sentence = model(features, max_sent_len, captions, beam_width)
-            #print(sentence)
-            #print(1/0)
-            if beam_width is not None:
-                sentence = sentence[1]
-            
-            s.add_sentence(image_ids[0], sentence)
-            if (i % 50) == 0:
-                logging.info("  {:4d}".format(i))
-    logging.info("Saving sentences...")
-    s.save_sentences()
-    logging.info("Done.")
-
-
 def train(args, model, train_loader, val_loader, optimizer, scheduler, len_vocab):
     logging.warning("Beginning training")
 
@@ -200,17 +113,16 @@ def train(args, model, train_loader, val_loader, optimizer, scheduler, len_vocab
     val_loss_array = []
 
     #some big number
-    min_val_loss = 10000000
+    min_val_loss = 10**5
 
     train_epoch_array = []
     val_epoch_array = []
     
     if args.current_epoch == 0 and args.debug == False:
-        val_loss = val_one_epoch(args,model,val_loader, optimizer, len_vocab, beam=None)
+        val_loss = val_one_epoch(args,model,val_loader, len_vocab, beam=None)
         logging.info("Validation loss with random initialization: " + str(val_loss))
     
     logging.info("Maximum of epochs: " + str(args.max_nb_epochs))
-        
 
     while args.current_epoch < args.max_nb_epochs:
         args.current_epoch += 1
@@ -218,20 +130,22 @@ def train(args, model, train_loader, val_loader, optimizer, scheduler, len_vocab
         
         t0=time.time()
         train_loss = train_one_epoch(args, model, train_loader, optimizer, len_vocab)
-
         logging.info("Train done in: {:3.1f} seconds".format(time.time() - t0))
         
         t0 = time.time()
-        val_loss = val_one_epoch(args,model,val_loader, optimizer, len_vocab, beam=None)
-        scheduler.step(val_loss)
+        val_loss = val_one_epoch(args,model,val_loader, len_vocab, beam=None)
         logging.info("Valid done in: {:3.1f} seconds".format(time.time() - t0))
 
+        scheduler.step(val_loss)
+
         torch.save({
-            'epoch': args.current_epoch,
-            'model_state_dict': model.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'scheduler_state_dict': scheduler.state_dict()
-        }, os.path.join(args.experiment_dir, "epoch_" + str(args.current_epoch) + ".pth.tar"))
+                    'epoch': args.current_epoch,
+                    'model_state_dict': model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'scheduler_state_dict': scheduler.state_dict()
+                    },
+                    os.path.join(args.experiment_dir,
+                             "epoch_" + str(args.current_epoch) + ".pth.tar"))
 
         train_loss_array.append(train_loss)
         val_loss_array.append(val_loss)
@@ -239,7 +153,7 @@ def train(args, model, train_loader, val_loader, optimizer, scheduler, len_vocab
         train_epoch_array.append(args.current_epoch)
         val_epoch_array.append(args.current_epoch)
 
-        #keep a track of the best model and save it
+        #keep track of the best model and save it
         if val_loss < min_val_loss:
             min_val_loss = val_loss
             torch.save({
@@ -260,26 +174,24 @@ def create_model(args, vocab, feature_dim):
     model = None
     #teacher_forcing ratio
     tf_ratio = args.teacher_forcing
+    logging.info("Teacher forcing ratio: {:.2f}".format(tf_ratio))
     
     model = Caption_Model(dict_size=len(vocab),
-                            image_feature_dim=feature_dim, vocab=vocab, tf_ratio=tf_ratio)
+                          image_feature_dim=feature_dim,
+                          vocab=vocab,
+                          tf_ratio=tf_ratio)
     
     if args.resume_epoch > 0:
         logging.info('Loading checkpoint')
         
-        if torch.cuda.is_available():
-            args.checkpoint = torch.load(os.path.join(args.experiment_dir, "epoch_" + str(args.resume_epoch) + ".pth.tar" ))
-            model.load_state_dict(args.checkpoint['model_state_dict'])
-        else:
-            args.checkpoint = torch.load(os.path.join(args.experiment_dir, "epoch_" + str(args.resume_epoch) + ".pth.tar" ), 
-                                        map_location = lambda storage, location: 'cpu')
-            model.load_state_dict(args.checkpoint['model_state_dict'])
-
-
+        args.checkpoint = torch.load(os.path.join(args.experiment_dir,
+                            "epoch_" + str(args.resume_epoch) + ".pth.tar" ))
+        model.load_state_dict(args.checkpoint['model_state_dict'])
         args.current_epoch = args.resume_epoch
     elif args.resume_epoch < 0:
         logging.info('Loading best checkpoint')
-        args.checkpoint = torch.load(os.path.join(args.experiment_dir, "best_model" + ".pth.tar" ))
+        args.checkpoint = torch.load(os.path.join(args.experiment_dir,
+                                                "best_model" + ".pth.tar" ))
         model.load_state_dict(args.checkpoint['model_state_dict'])
         args.current_epoch = args.checkpoint['epoch']
     else:
@@ -302,14 +214,9 @@ def main():
         os.makedirs(args.experiment_dir)
     utils.initialize_logger(args.experiment_dir)
     logging.warning("Starting {}, run {}.".format(args.name, args.run_nb))
-    #try:
-        #args = utils.load_args(args.experiment_dir, ARGS_FILE)
-        #save each time
-    #    pass
-    #except:
+
     args.current_epoch = 0
     utils.save_args(args, args.experiment_dir, ARGS_FILE)
-
 
     logging.info("Loading data...")
     with open(os.path.join(args.root_dir, 'vocab.pkl'), 'rb') as f:
@@ -349,27 +256,29 @@ def main():
         model = model.cuda()
         logging.info("GPU type:\n{}".format(torch.cuda.get_device_name(0)))
 
-    print("args.opt: " + args.opt)
+    logging.info("args.opt: " + args.opt)
     optimizer = None
     if args.opt == "Adam":
         optimizer = optim.Adam(model.parameters(), lr=args.lr)
     elif args.opt == "SGD":
-        optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum = 0.899999976158, weight_decay=0.000500000023749)
+        optimizer = optim.SGD(model.parameters(),
+                              lr=args.lr,
+                              momentum = 0.899999976158,
+                              weight_decay=0.000500000023749)
     scheduler = ReduceLROnPlateau(optimizer, 'min')
 
     if args.resume_epoch > 0:
         optimizer.load_state_dict(args.checkpoint['optimizer_state_dict'])
         scheduler.load_state_dict(args.checkpoint['scheduler_state_dict'])
 
-
     logging.info(model)
-    train(args, model, train_loader, val_loader, optimizer, scheduler, len(vocab))
-
-    t0 = time.time()
-    #test_loss = test(args,model,test_loader, len(vocab), beam = 5)
-    #logging.info("Testing done in: {:3.1f} seconds".format(time.time() - t0))
-    if args.beam_search:
-        save_final_captions(args, model, test_loader, max_sent_len=12, beam_width = 5)
+    train(args,
+          model,
+          train_loader,
+          val_loader,
+          optimizer,
+          scheduler,
+          len(vocab))
 
 if __name__ == "__main__":
     main()
