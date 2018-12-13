@@ -113,7 +113,7 @@ def train(args, model, train_loader, val_loader, optimizer, scheduler, len_vocab
     val_loss_array = []
 
     #some big number
-    min_val_loss = 10000000
+    min_val_loss = 10**5
 
     train_epoch_array = []
     val_epoch_array = []
@@ -123,7 +123,6 @@ def train(args, model, train_loader, val_loader, optimizer, scheduler, len_vocab
         logging.info("Validation loss with random initialization: " + str(val_loss))
     
     logging.info("Maximum of epochs: " + str(args.max_nb_epochs))
-        
 
     while args.current_epoch < args.max_nb_epochs:
         args.current_epoch += 1
@@ -256,17 +255,15 @@ def main():
         model = model.cuda()
         logging.info("GPU type:\n{}".format(torch.cuda.get_device_name(0)))
 
-    print("args.opt: " + args.opt)
+    logging.info("args.opt: " + args.opt)
     optimizer = None
     if args.opt == "Adam":
         optimizer = optim.Adam(model.parameters(), lr=args.lr)
-        logging.info("Optimizing with Adam")
     elif args.opt == "SGD":
         optimizer = optim.SGD(model.parameters(),
                               lr=args.lr,
                               momentum = 0.899999976158,
                               weight_decay=0.000500000023749)
-        logging.info("Optimizing with SGD")
     scheduler = ReduceLROnPlateau(optimizer, 'min')
 
     if args.resume_epoch > 0:
