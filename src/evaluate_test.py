@@ -9,8 +9,7 @@ matplotlib.use('agg')
 import matplotlib.pyplot as plt
 
 import torch
-import torch.optim as optim
-from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.nn.utils.rnn import pack_padded_sequence
 
 import utils_experiment as utils
 from data_helpers.data_loader_ks import get_loader
@@ -30,39 +29,43 @@ if torch.cuda.is_available():
 else:
     device = torch.device('cpu')
 
-
-def test(args, model, test_loader, len_vocab, beam=None):
+def test(args, model, val_loader, len_vocab, beam=None):
     model.eval()
-    nb_batch = len(test_loader)
-    nb_test = nb_batch * args.batch_size
-    logging.info("Testing {} batches, {} samples.".format(nb_batch, nb_test))
+    nb_batch = len(val_loader)
+    nb_val = nb_batch * args.batch_size
+    logging.info("Validating {} batches, {} samples.".format(nb_batch, nb_val))
 
     loss = torch.nn.CrossEntropyLoss()
-    
     epoch_loss = 0
 
     with torch.no_grad():
-        for i, (image_ids, features, captions, lengths) in enumerate(test_loader):
-        #print(i)
+        for i, (image_ids,features,captions,lengths) in enumerate(val_loader):
             len_captions = len(captions[0])
             if torch.cuda.is_available():
                 features, captions = features.cuda(), captions.cuda()
 
             if beam is not None:
-                if (i % (nb_batch//2)) == 0:
-                    sentences = model(features[0:1], 20, beam)
+                if (i % 200) == 0:
+                    sentences = model(features, 20, beam)
                     print(sentences)
-            out = model(features, len_captions)
+            out = model(features, len_captions, captions)
             n_ex, vocab_len = out.view(-1, len_vocab).shape
             captions = captions[:,1:]
-            batch_loss = loss(out.view(-1,len_vocab),captions.contiguous().view(1, n_ex).squeeze())
+            
+            decode_lengths = [x-1 for x in lengths]
+            captions,_ = pack_padded_sequence(captions,
+                                              decode_lengths,
+                                              batch_first=True)
+            out,_ = pack_padded_sequence(out, decode_lengths, batch_first=True)
+
+            batch_loss = loss(out,captions)
             epoch_loss+=batch_loss.item()
    
     epoch_loss = epoch_loss/nb_batch
-    logging.info("Test loss: " + str(epoch_loss))
+    logging.info("Val loss: {:>.3E}".format(epoch_loss))
     return epoch_loss
 
-def save_final_captions(args, model, val_loader, vocab, max_sent_len, beam_width=None):
+def save_final_captions(args, model, val_loader, max_sent_len, beam_width):
     nb_batch = len(val_loader)
     nb_val = nb_batch * args.batch_size
     assert nb_batch == nb_val # Must be equal for beam search
@@ -74,57 +77,21 @@ def save_final_captions(args, model, val_loader, vocab, max_sent_len, beam_width
         for i, (image_ids, features, captions, lengths) in enumerate(val_loader):
             if torch.cuda.is_available():
                 features = features.cuda()
-            sentence = model(features, max_sent_len, beam_width)
-            prev_word_id = -1
-            prev_word_ids = []
-            if beam_width == None:
-                sentence = sentence.squeeze()
-                #sentence = [ vocab.get_word(torch.nonzero(onehotarray)[0][0]) for onehotarray in sentence]
-                sentence1 = []
-                correct_sentence = []
-                #print(captions)
-                #print(captions[0])
-                for i in range((len(captions[0]))):
-                    correct_sentence.append(vocab.get_word(captions[0][i].item()))
-                for i in range(len(sentence)):
-                    curr_word_id = torch.argmax(sentence[i]).item()
-                    
-                    """
-                    if curr_word_id == prev_word_id:
-                        _, indices = torch.topk(sentence[i],2)
-                        second_max_index = indices[1]
-                        curr_word_id = second_max_index.item()
-                    """
-                    if curr_word_id in prev_word_ids:
-                        _,indices = torch.topk(sentence[i],20)
-                        top_count = 0
-                        while curr_word_id in prev_word_ids:
-                            top_count += 1
-                            curr_word_id = indices[top_count].item()
-                            
-                    
-                    sentence1.append(vocab.get_word(curr_word_id))
-                    #prev_word_id = curr_word_id
-                    prev_word_ids.append(curr_word_id)
-                print("Correct sentence: ")
-                print(correct_sentence)
-                print("Predicted: ")
-                print(sentence1)
-                s.add_sentence(image_ids[0], sentence1)
-            else:
-                s.add_sentence(image_ids[0], sentence[1])
+            sentence = model(features, max_sent_len, None, beam_width)
+            s.add_sentence(image_ids[0], sentence[1])
             if (i % 50) == 0:
                 logging.info("  {:4d}".format(i))
     logging.info("Saving sentences...")
     s.save_sentences()
     logging.info("Done.")
 
-
 def create_model(args, vocab, feature_dim):
     model = None
     
-    model = Caption_Model(dict_size=len(vocab),
-                            image_feature_dim=feature_dim, vocab=vocab)
+    model = Caption_Model(dict_size=len(vocab), 
+                          image_feature_dim=feature_dim,
+                          vocab=vocab,
+                          tf_ratio=0.0)
     
     if args.resume_epoch > 0:
         logging.info('Loading checkpoint')
@@ -182,9 +149,8 @@ def main():
 
     t0 = time.time()
     
-    save_final_captions(args, model, test_loader, vocab, max_sent_len=12)
-    #save_final_captions(args, model, test_loader, vocab, max_sent_len=12, beam_width=5)
-    test_loss = test(args,model,test_loader, len(vocab), beam=None)
+    # save_final_captions(args, model, test_loader, max_sent_len=12, beam_width=5)
+    test_loss = test(args, model, test_loader, len(vocab), beam=None)
     logging.info("Testing done in: {:3.1f} seconds".format(time.time() - t0))
 
 if __name__ == "__main__":
