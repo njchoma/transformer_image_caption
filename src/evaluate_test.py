@@ -88,6 +88,7 @@ def save_final_captions(args, model, val_loader, max_sent_len, beam_width):
 def create_model(args, vocab, feature_dim):
     model = None
     
+    tf_ratio = 1.0
     if args.model_type == 'bottom_up':
         model = Caption_Model(dict_size=len(vocab),
                               image_feature_dim=feature_dim,
