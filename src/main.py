@@ -173,7 +173,7 @@ def train(args, model, train_loader, val_loader, optimizer, scheduler, len_vocab
 def create_model(args, vocab, feature_dim):
     model = None
     #teacher_forcing ratio
-    tf_ratio = 0.5
+    tf_ratio = 1.0
     logging.info("Teacher forcing ratio: {:.2f}".format(tf_ratio))
     
     model = Caption_Model(dict_size=len(vocab),
