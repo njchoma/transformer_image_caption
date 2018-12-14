@@ -24,6 +24,8 @@ def read_args():
             help='Set flag to load small dataset')
     add_arg('--beam_search', action='store_true',
             help='Set flag to use beam search while evaluating')
+    add_arg('--model_type', type=str, default="bottom_up",
+            help='Model type')
     # TRAINING
     add_arg('--batch_size', type=int, default=1,
             help='Minibatch size')

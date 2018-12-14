@@ -176,10 +176,17 @@ def create_model(args, vocab, feature_dim):
     tf_ratio = 1.0
     logging.info("Teacher forcing ratio: {:.2f}".format(tf_ratio))
     
-    model = Caption_Model(dict_size=len(vocab),
-                          image_feature_dim=feature_dim,
-                          vocab=vocab,
-                          tf_ratio=tf_ratio)
+    if args.model_type == 'bottom_up':
+        model = Caption_Model(dict_size=len(vocab),
+                              image_feature_dim=feature_dim,
+                              vocab=vocab,
+                              tf_ratio=tf_ratio)
+    elif args.model_type == 'simple':
+        logging.error("Simple model not yet implemented")
+        exit()
+    elif args.model_type == 'transformer':
+        logging.error("Transformer model not yet implemented")
+        exit()
     
     if args.resume_epoch > 0:
         logging.info('Loading checkpoint')
