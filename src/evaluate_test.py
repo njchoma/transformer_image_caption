@@ -88,10 +88,18 @@ def save_final_captions(args, model, val_loader, max_sent_len, beam_width):
 def create_model(args, vocab, feature_dim):
     model = None
     
-    model = Caption_Model(dict_size=len(vocab), 
-                          image_feature_dim=feature_dim,
-                          vocab=vocab,
-                          tf_ratio=0.0)
+    tf_ratio = 1.0
+    if args.model_type == 'bottom_up':
+        model = Caption_Model(dict_size=len(vocab),
+                              image_feature_dim=feature_dim,
+                              vocab=vocab,
+                              tf_ratio=tf_ratio)
+    elif args.model_type == 'simple':
+        logging.error("Simple model not yet implemented")
+        exit()
+    elif args.model_type == 'transformer':
+        logging.error("Transformer model not yet implemented")
+        exit()
     
     if args.resume_epoch > 0:
         logging.info('Loading checkpoint')

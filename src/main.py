@@ -16,8 +16,10 @@ from torch.nn.utils.rnn import pack_padded_sequence
 import utils_experiment as utils
 from data_helpers.data_loader_ks import get_loader
 from data_helpers.vocab import Vocabulary
+
 from models.caption_model import Caption_Model
 from eval.coco_caption.eval import evaluate
+from models.simple_model import Simple_Model
 
 #########################################
 #               CONSTANTS               #
@@ -211,10 +213,23 @@ def create_model(args, vocab, feature_dim):
     tf_ratio = args.teacher_forcing
     logging.info("Teacher forcing ratio: {:.2f}".format(tf_ratio))
     
-    model = Caption_Model(dict_size=len(vocab),
-                          image_feature_dim=feature_dim,
-                          vocab=vocab,
-                          tf_ratio=tf_ratio)
+    if args.model_type == 'bottom_up':
+        model = Caption_Model(dict_size=len(vocab),
+                              image_feature_dim=feature_dim,
+                              vocab=vocab,
+                              tf_ratio=tf_ratio)
+        logging.info("Bottom-Up model created.")
+    elif args.model_type == 'simple':
+        model = Simple_Model(dict_size=len(vocab),
+                              image_feature_dim=feature_dim,
+                              vocab=vocab,
+                              tf_ratio=tf_ratio)
+        logging.info("Simple model created.")
+    elif args.model_type == 'transformer':
+        logging.error("Transformer model not yet implemented")
+        exit()
+    else:
+        logging.error("Model type {} not understood".format(args.model_type))
     
     if args.resume_epoch > 0:
         logging.info('Loading checkpoint')

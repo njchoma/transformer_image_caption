@@ -52,13 +52,12 @@ class CocoDataset(data.Dataset):
             
             ids = list(self.coco.keys())
         else:
-            
-            if data_type == 'train':
+            if data_type == 'not_used':
                 file_name = os.path.join(data_root, "karpathy_splits" ,data_type + "36_ks_med.hdf5") 
                 with open(os.path.join(data_root, "karpathy_splits", data_type + "_karpathy_medium.pkl"), 'rb') as f:
                     self.coco = pickle.load(f)
             else:
-                file_name = os.path.join(data_root, "karpathy_splits" ,data_type + "36_ks.hdf5") 
+                file_name = os.path.join(data_root,"karpathy_splits",data_type + "36_ks.hdf5") 
                 with open(os.path.join(data_root, "karpathy_splits", data_type + "_karpathy.pkl"), 'rb') as f:
                     self.coco = pickle.load(f)
                     
