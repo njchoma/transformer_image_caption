@@ -17,6 +17,7 @@ import utils_experiment as utils
 from data_helpers.data_loader_ks import get_loader
 from data_helpers.vocab import Vocabulary
 from models.caption_model import Caption_Model
+from eval.coco_caption.eval import evaluate
 
 #########################################
 #               CONSTANTS               #
@@ -69,7 +70,7 @@ def train_one_epoch(args, model, train_loader, optimizer, len_vocab):
     logging.info("Train loss: {:>.3E}".format(epoch_loss))
     return epoch_loss
 
-def val_one_epoch(args, model, val_loader, len_vocab, beam=None):
+def val_one_epoch(args, model, val_loader, len_vocab, vocab, beam=None):
     model.eval()
     nb_batch = len(val_loader)
     nb_val = nb_batch * args.batch_size
@@ -79,9 +80,15 @@ def val_one_epoch(args, model, val_loader, len_vocab, beam=None):
     
     epoch_loss = 0
 
+    gts = {}
+    res = {}
+
     with torch.no_grad():
         for i, (image_ids, features, captions, lengths) in enumerate(val_loader):
             len_captions = len(captions[0])
+
+            #serial part. Will not slow done much as size of val dataset is only 5k
+
             if torch.cuda.is_available():
                 features, captions = features.cuda(), captions.cuda()
 
@@ -91,9 +98,28 @@ def val_one_epoch(args, model, val_loader, len_vocab, beam=None):
                     print(sentences)
 
             out = model(features, len_captions, captions)
+            
+            for ii, image_id in enumerate(image_ids):    
+                caption_list = [vocab.get_word(wid.item()) for wid in captions[ii] if wid!= 0]                
+                caption_list = caption_list[1:-2]
+                caption = ' '.join(caption_list)
+                padded_result = [vocab.get_word(torch.argmax(one_hot_en).item()) for one_hot_en in out[ii]]
+                result_list = []
+                for word in padded_result:
+                    if word == '.' or word == '<end>':
+                        break
+                    result_list.append(word)
+                result = ' '.join(result_list)
+                if image_id in gts:
+                    gts[image_id].append({'image_id': int(image_id), 'caption': caption})
+                else:
+                    gts[image_id] = [{'image_id': int(image_id), 'caption': caption}]
+
+                res[image_id] = [{'image_id': int(image_id), 'caption': result}]
+
             n_ex, vocab_len = out.view(-1, len_vocab).shape
             captions = captions[:,1:]
-
+            
             decode_lengths = [x-1 for x in lengths]
             captions,_ = pack_padded_sequence(captions,
                                               decode_lengths,
@@ -101,26 +127,27 @@ def val_one_epoch(args, model, val_loader, len_vocab, beam=None):
             out,_ = pack_padded_sequence(out, decode_lengths,batch_first = True)
             batch_loss = loss(out,captions)
             epoch_loss+=batch_loss.item()
-   
+    bleu4_score = evaluate(gts,res)
+    logging.info("BLEU score computed: " + str(bleu4_score))
     epoch_loss = epoch_loss/nb_batch
     logging.info("Val loss: {:>.3E}".format(epoch_loss))
-    return epoch_loss
+    return bleu4_score, epoch_loss
 
-def train(args, model, train_loader, val_loader, optimizer, scheduler, len_vocab):
+def train(args, model, train_loader, val_loader, optimizer, scheduler, len_vocab, vocab):
     logging.warning("Beginning training")
 
     train_loss_array = []
     val_loss_array = []
-
+    val_bleu4_array = []
     #some big number
     min_val_loss = 10**5
-
+    max_bleu_score = 100
     train_epoch_array = []
     val_epoch_array = []
     
-    if args.current_epoch == 0 and args.debug == False:
-        val_loss = val_one_epoch(args,model,val_loader, len_vocab, beam=None)
-        logging.info("Validation loss with random initialization: " + str(val_loss))
+    if args.current_epoch == 0:
+        bleu4_score, val_loss = val_one_epoch(args,model,val_loader, len_vocab, vocab, beam=None)
+        logging.info("Validation loss with random initialization. Loss: " + str(val_loss) + ", BLEU4 score: " + str(bleu4_score))
     
     logging.info("Maximum of epochs: " + str(args.max_nb_epochs))
 
@@ -133,7 +160,7 @@ def train(args, model, train_loader, val_loader, optimizer, scheduler, len_vocab
         logging.info("Train done in: {:3.1f} seconds".format(time.time() - t0))
         
         t0 = time.time()
-        val_loss = val_one_epoch(args,model,val_loader, len_vocab, beam=None)
+        bleu4_score, val_loss = val_one_epoch(args,model,val_loader, len_vocab, vocab, beam=None)
         logging.info("Valid done in: {:3.1f} seconds".format(time.time() - t0))
 
         scheduler.step(val_loss)
@@ -149,26 +176,34 @@ def train(args, model, train_loader, val_loader, optimizer, scheduler, len_vocab
 
         train_loss_array.append(train_loss)
         val_loss_array.append(val_loss)
-
+        val_bleu4_array.append(bleu4_score)
         train_epoch_array.append(args.current_epoch)
         val_epoch_array.append(args.current_epoch)
 
         #keep track of the best model and save it
-        if val_loss < min_val_loss:
-            min_val_loss = val_loss
+        if bleu4_score > max_bleu_score:
+            max_bleu_score = bleu4_score
             torch.save({
                 'epoch': args.current_epoch,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'scheduler_state_dict': scheduler.state_dict()
             }, os.path.join(args.experiment_dir, "best_model"  + ".pth.tar"))
-    
+    plt.figure(0)
     plt.plot(train_epoch_array, train_loss_array, label='Training loss')
     plt.plot(val_epoch_array, val_loss_array, label = 'Validation loss')
     plt.legend()
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.savefig(os.path.join(args.experiment_dir, "loss_stats.png"))
+
+    plt.figure(1)
+    plt.plot(val_epoch_array, val_bleu4_array, label = 'Validation BLEU score')
+    plt.legend()
+    plt.xlabel('Epoch')
+    plt.ylabel('BLEU score')
+    plt.savefig(os.path.join(args.experiment_dir, "bleu_stats.png"))
+    
 
 def create_model(args, vocab, feature_dim):
     model = None
@@ -278,7 +313,8 @@ def main():
           val_loader,
           optimizer,
           scheduler,
-          len(vocab))
+          len(vocab), 
+          vocab)
 
 if __name__ == "__main__":
     main()
