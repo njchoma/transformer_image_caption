@@ -17,9 +17,11 @@ import utils_experiment as utils
 from data_helpers.data_loader_ks import get_loader
 from data_helpers.vocab import Vocabulary
 
+# from eval.coco_caption.eval import evaluate
+
 from models.caption_model import Caption_Model
-from eval.coco_caption.eval import evaluate
 from models.simple_model import Simple_Model
+from models.transformer import Transformer
 
 #########################################
 #               CONSTANTS               #
@@ -129,7 +131,7 @@ def val_one_epoch(args, model, val_loader, len_vocab, vocab, beam=None):
             out,_ = pack_padded_sequence(out, decode_lengths,batch_first = True)
             batch_loss = loss(out,captions)
             epoch_loss+=batch_loss.item()
-    bleu4_score = evaluate(gts,res)
+    bleu4_score = 0 # evaluate(gts,res)
     logging.info("BLEU score computed: " + str(bleu4_score))
     epoch_loss = epoch_loss/nb_batch
     logging.info("Val loss: {:>.3E}".format(epoch_loss))
@@ -226,8 +228,11 @@ def create_model(args, vocab, feature_dim):
                               tf_ratio=tf_ratio)
         logging.info("Simple model created.")
     elif args.model_type == 'transformer':
-        logging.error("Transformer model not yet implemented")
-        exit()
+        model = Transformer(dict_size=len(vocab),
+                              image_feature_dim=feature_dim,
+                              vocab=vocab,
+                              tf_ratio=tf_ratio)
+        logging.info("Transformer model created.")
     else:
         logging.error("Model type {} not understood".format(args.model_type))
     
