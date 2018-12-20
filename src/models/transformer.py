@@ -361,7 +361,9 @@ def get_sinusoid_encoding_table(n_position, d_hid, padding_idx=None):
         return position / np.power(10000, 2 * (hid_idx // 2) / d_hid)
 
     def get_posi_angle_vec(position):
-        return [cal_angle(position, hid_j) for hid_j in range(d_hid)]
+        all_hid_idx = np.arange(d_hid)
+        pos = position / np.power(10000, 2 * (all_hid_idx // 2) / d_hid)
+        return pos.tolist()
 
     sinusoid_table = np.array([get_posi_angle_vec(pos_i) for pos_i in range(n_position)])
 
