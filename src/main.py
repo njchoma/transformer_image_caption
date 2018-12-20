@@ -89,6 +89,8 @@ def val_one_epoch(args, model, val_loader, len_vocab, vocab, beam=None):
 
     with torch.no_grad():
         for i, (image_ids, features, captions, lengths) in enumerate(val_loader):
+            if (i % (nb_batch//2)) == 0:
+                logging.info("  {:5d}".format(i))
             len_captions = len(captions[0])
 
             #serial part. Will not slow done much as size of val dataset is only 5k
