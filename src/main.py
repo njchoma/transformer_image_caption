@@ -89,7 +89,7 @@ def val_one_epoch(args, model, val_loader, len_vocab, vocab, beam=None):
 
     with torch.no_grad():
         for i, (image_ids, features, captions, lengths) in enumerate(val_loader):
-            if (i % (nb_batch//2)) == 0:
+            if (i % (nb_batch//20)) == 0:
                 logging.info("  {:5d}".format(i))
             len_captions = len(captions[0])
 
@@ -105,6 +105,7 @@ def val_one_epoch(args, model, val_loader, len_vocab, vocab, beam=None):
 
             out = model(features, len_captions, captions)
             
+            '''
             for ii, image_id in enumerate(image_ids):    
                 caption_list = [vocab.get_word(wid.item()) for wid in captions[ii] if wid!= 0]                
                 caption_list = caption_list[1:-2]
@@ -123,6 +124,7 @@ def val_one_epoch(args, model, val_loader, len_vocab, vocab, beam=None):
 
                 res[image_id] = [{'image_id': int(image_id), 'caption': result}]
 
+            '''
             n_ex, vocab_len = out.view(-1, len_vocab).shape
             captions = captions[:,1:]
             

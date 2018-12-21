@@ -15,8 +15,6 @@ import models.utils_models as utils
 #               CONSTANTS               #
 #########################################
 WORD_EMB_DIM    = 1000
-NB_HIDDEN_LSTM1 = 1000
-NB_HIDDEN_LSTM2 = 1000
 NB_HIDDEN_ATT   = 512
 
 
@@ -276,37 +274,6 @@ class Embed_Word(nn.Module):
     def forward(self, word):
         emb_word = self.embed_word(word)
         return emb_word
-
-
-
-class Attention_LSTM(nn.Module):
-    def __init__(self, dim_word_emb, dim_lang_lstm, dim_image_feats, nb_hidden):
-        super(Attention_LSTM,self).__init__()
-        self.lstm_cell = nn.LSTMCell(dim_lang_lstm+dim_image_feats+dim_word_emb,
-                                     nb_hidden,
-                                     bias=True)
-        
-    def forward(self, h1, c1, h2, v_mean, word_emb):
-        #print(h2.shape)
-        #print(v_mean.shape)
-        #print(word_emb.shape)
-        input_feats = torch.cat((h2, v_mean, word_emb),dim=1)
-        h_out, c_out = self.lstm_cell(input_feats, (h1, c1))
-        return h_out, c_out
-
-class Language_LSTM(nn.Module):
-    def __init__(self, dim_att_lstm, dim_visual_att, nb_hidden):
-        super(Language_LSTM,self).__init__()
-        self.lstm_cell = nn.LSTMCell(dim_att_lstm+dim_visual_att,
-                                     nb_hidden,
-                                     bias=True)
-        
-    def forward(self, h2, c2, h1, v_hat):
-        #print(h1.shape)
-        #print(v_hat.shape)
-        input_feats = torch.cat((h1, v_hat),dim=1)
-        h_out, c_out = self.lstm_cell(input_feats, (h2, c2))
-        return h_out, c_out
 
 
 class Visual_Attention(nn.Module):

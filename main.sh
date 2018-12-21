@@ -2,21 +2,22 @@
 
 #SBATCH --output=slurm_out/caption_%A_%a.out
 #SBATCH --gres=gpu:1
-#SBATCH --mem=10G
+#SBATCH --mem=80G
 #SBATCH --time=2-00:00:00
 
 ROOT_DIR="/scratch/ovd208/COCO_features/data"
 ARTIFACTS_DIR="$SCRATCH/artifacts/image_captioning"
-NAME='aa_full_test_run'
+NAME='dd_full_data'
 RUN_NB="$SLURM_ARRAY_TASK_ID"
 
-MAX_NB_EPOCHS=40
+BATCH_SIZE=100
+MAX_NB_EPOCHS=15
 
 echo "Starting $NAME"
 
 OPTIONS=""
 
-PYARGS="--root_dir $ROOT_DIR --artifacts_dir $ARTIFACTS_DIR --name $NAME --max_nb_epochs $MAX_NB_EPOCHS --run_nb $RUN_NB $OPTIONS"
+PYARGS="--root_dir $ROOT_DIR --artifacts_dir $ARTIFACTS_DIR --name $NAME --max_nb_epochs $MAX_NB_EPOCHS --batch_size $BATCH_SIZE --run_nb $RUN_NB $OPTIONS"
 
 source $SCRATCH/pyenv/img_caption/bin/activate
 python src/main.py $PYARGS
