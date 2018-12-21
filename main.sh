@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --output=slurm_out/caption_%A_%a.out
+#SBATCH --output=caption_%A_%a.out
 #SBATCH --gres=gpu:1
 #SBATCH --mem=80G
 #SBATCH --time=2-00:00:00
