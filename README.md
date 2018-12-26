@@ -19,6 +19,8 @@ Machine configuration used for testing: Nvidia P40 GPUs card with 24GB memory (t
 
 We use the Karpathy splits as described in [Deep visual-semantic alignments for generating image descriptions.](https://cs.stanford.edu/people/karpathy/cvpr2015.pdf). The Bottom-Up image features are used directly from [here](https://imagecaption.blob.core.windows.net/imagecaption/trainval.zip). Please refer to [this repo](https://github.com/peteanderson80/Up-Down-Captioner) for clarifications. The annotations are downloaded from the [COCO website](http://cocodataset.org/#download) (2014 train val annotations). All the models have been trained from scratch.
 
+
+
 The code takes around 8 hours to train on the karpathy train split.
 
 ### Prerequisites
@@ -29,13 +31,14 @@ Software used:
 1. Pytorch 0.4.1
 2. Python 2.7
 
-Dependencies:
+Dependencies: Create a conda environment using the captioning_env.yml file. Use: conda env create -f captioning_env.yml
 
 If you are not using conda as a package manager, refer to the yml file and install the libraries manually.
 
 ## Running the code
 
-Run main.sh script with the appropriate arguments. The arguments have been listed in the [src/utils_experiment.py](https://github.com/njchoma/transformer_image_caption/blob/master/src/utils_experiment.py) file. 
+1.Edit the main1.sh file by changing the SRCDIR variable and activating the appropriate conda environment
+Run main1.sh script with the appropriate arguments. The arguments have been listed in the [src/utils_experiment.py](https://github.com/njchoma/transformer_image_caption/blob/master/src/utils_experiment.py) file. 
 
 After the model has been trained, run [src/evaluate_test.py](https://github.com/njchoma/transformer_image_caption/blob/master/src/evaluate_test.py)
 
