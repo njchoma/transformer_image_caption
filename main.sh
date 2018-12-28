@@ -1,22 +1,21 @@
 #!/bin/bash
-
-#SBATCH --output=slurm_out/caption_%A_%a.out
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=10
+#SBATCH --time=30:00:00
+#SBATCH --mem=80GB
 #SBATCH --gres=gpu:1
-#SBATCH --mem=10G
-#SBATCH --time=2-00:00:00
+#SBATCH --job-name=main_run
+#SBATCH --output=slurm_%j.out
 
-ROOT_DIR="/scratch/ovd208/COCO_features/data"
-ARTIFACTS_DIR="$SCRATCH/artifacts/image_captioning"
-NAME='aa_full_test_run'
-RUN_NB="$SLURM_ARRAY_TASK_ID"
+#nvidia-smi
 
-MAX_NB_EPOCHS=40
+SRCDIR=$HOME/repos/transformer_image_caption/src/
+cd $SRCDIR
+source activate imageCaptioning
 
-echo "Starting $NAME"
+ARTIFACTS_DIR=/scratch/ovd208/IC_training
+ROOT_DIR=/scratch/ovd208/COCO_features/data
+EXP_NAME=baseline_full
+MODEL_NAME=bottom_up
 
-OPTIONS=""
-
-PYARGS="--root_dir $ROOT_DIR --artifacts_dir $ARTIFACTS_DIR --name $NAME --max_nb_epochs $MAX_NB_EPOCHS --run_nb $RUN_NB $OPTIONS"
-
-source $SCRATCH/pyenv/img_caption/bin/activate
-python src/main.py $PYARGS
+python train.py --root_dir $ROOT_DIR --artifacts_dir $ARTIFACTS_DIR --name $EXP_NAME --batch_size 100 --max_nb_epochs 10 --lr 0.00005 --opt Adam --run_nb 0 --resume_epoch 0 --beam_search --teacher_forcing 1 --model_type $MODEL_NAME
