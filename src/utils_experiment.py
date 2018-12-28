@@ -26,6 +26,28 @@ def read_args():
             help='Set flag to use beam search while evaluating')
     add_arg('--model_type', type=str, default="bottom_up",
             help='Model type')
+    add_arg('--beam_width', type=int, default=5,
+            help='Beam width (used in evaluation)')
+    # TRAINING
+    add_arg('--batch_size', type=int, default=1,
+            help='Minibatch size')
+    add_arg('--resume_epoch', type=int, default=0,
+            help='resume epoch number (0 if starting from scratch)')
+    add_arg('--max_nb_epochs', type=int, default=1000,
+            help='Maximum number of epochs to train') 
+    add_arg('--lr', type=float, default=0.001,
+            help='Learning rate')
+    add_arg('--opt', type=str, default="Adam",
+            help='Optimization method')
+    add_arg('--teacher_forcing', type=float, default=0,
+            help='teacher forcing ratio')
+    
+
+    return parser.parse_args()
+
+def initialize_logger(experiment_dir):
+    logfile = os.path.join(experiment_dir, 'log.txt')
+    add_arg()
     # TRAINING
     add_arg('--batch_size', type=int, default=1,
             help='Minibatch size')

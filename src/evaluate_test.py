@@ -15,6 +15,7 @@ import utils_experiment as utils
 from data_helpers.data_loader_ks import get_loader
 from data_helpers.vocab import Vocabulary
 from models.caption_model import Caption_Model
+from models.simple_model import Simple_Model
 
 #########################################
 #               CONSTANTS               #
@@ -94,9 +95,13 @@ def create_model(args, vocab, feature_dim):
                               image_feature_dim=feature_dim,
                               vocab=vocab,
                               tf_ratio=tf_ratio)
+        logging.info("Bottom-Up model created.")
     elif args.model_type == 'simple':
-        logging.error("Simple model not yet implemented")
-        exit()
+        model = Simple_Model(dict_size=len(vocab),
+                              image_feature_dim=feature_dim,
+                              vocab=vocab,
+                              tf_ratio=tf_ratio)
+        logging.info("Simple model created.")
     elif args.model_type == 'transformer':
         logging.error("Transformer model not yet implemented")
         exit()
@@ -157,7 +162,7 @@ def main():
 
     t0 = time.time()
     
-    save_final_captions(args, model, test_loader, max_sent_len=12, beam_width=5)
+    save_final_captions(args, model, test_loader, max_sent_len=12, beam_width=args.beam_width)
     test_loss = test(args, model, test_loader, len(vocab), beam=None)
     logging.info("Testing done in: {:3.1f} seconds".format(time.time() - t0))
 

@@ -12,6 +12,7 @@ pylab.rcParams['figure.figsize'] = (10.0, 8.0)
 import json
 from json import encoder
 import argparse
+import pickle
 
 def evaluate(gts, res):
 
@@ -43,11 +44,11 @@ def evaluate(gts, res):
 
     # evaluate results
     # SPICE will take a few minutes the first time, but speeds up due to caching
-    return cocoEval.evaluate(gts, res)
-
     # print output evaluation scores
     #for metric, score in cocoEval.eval.items():
         #print '%s: %.3f'%(metric, score)
+    return cocoEval.evaluate(gts, res)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

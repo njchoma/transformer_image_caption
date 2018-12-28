@@ -54,10 +54,12 @@ class COCOEvalCap:
                     if m == "Bleu_4":
                         bleu_4_score = sc   
                     logging.info("%s: %0.3f"%(m, sc))
+                    print("%s: %0.3f"%(m, sc))
             else:
                 self.setEval(score, method)
                 self.setImgToEvalImgs(scores, gts.keys(), method)
                 logging.info("%s: %0.3f"%(method, score))
+                print("%s: %0.3f"%(method, score))
         self.setEvalImgs()
         return bleu_4_score
 
