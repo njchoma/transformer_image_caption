@@ -17,9 +17,11 @@ import utils_experiment as utils
 from data_helpers.data_loader_ks import get_loader
 from data_helpers.vocab import Vocabulary
 
+# from eval.coco_caption.eval import evaluate
+
 from models.caption_model import Caption_Model
-from eval.coco_caption.eval import evaluate
 from models.simple_model import Simple_Model
+from models.transformer import Transformer
 
 #########################################
 #               CONSTANTS               #
@@ -87,6 +89,8 @@ def val_one_epoch(args, model, val_loader, len_vocab, vocab, beam=None):
 
     with torch.no_grad():
         for i, (image_ids, features, captions, lengths) in enumerate(val_loader):
+            if (i % (nb_batch//20)) == 0:
+                logging.info("  {:5d}".format(i))
             len_captions = len(captions[0])
 
             #serial part. Will not slow done much as size of val dataset is only 5k
@@ -101,6 +105,7 @@ def val_one_epoch(args, model, val_loader, len_vocab, vocab, beam=None):
 
             out = model(features, len_captions, captions)
             
+            '''
             for ii, image_id in enumerate(image_ids):    
                 caption_list = [vocab.get_word(wid.item()) for wid in captions[ii] if wid!= 0]                
                 caption_list = caption_list[1:-2]
@@ -119,6 +124,7 @@ def val_one_epoch(args, model, val_loader, len_vocab, vocab, beam=None):
 
                 res[image_id] = [{'image_id': int(image_id), 'caption': result}]
 
+            '''
             n_ex, vocab_len = out.view(-1, len_vocab).shape
             captions = captions[:,1:]
             
@@ -129,7 +135,7 @@ def val_one_epoch(args, model, val_loader, len_vocab, vocab, beam=None):
             out,_ = pack_padded_sequence(out, decode_lengths,batch_first = True)
             batch_loss = loss(out,captions)
             epoch_loss+=batch_loss.item()
-    bleu4_score = evaluate(gts,res)
+    bleu4_score = 0 # evaluate(gts,res)
     logging.info("BLEU score computed: " + str(bleu4_score))
     epoch_loss = epoch_loss/nb_batch
     logging.info("Val loss: {:>.3E}".format(epoch_loss))
@@ -226,8 +232,11 @@ def create_model(args, vocab, feature_dim):
                               tf_ratio=tf_ratio)
         logging.info("Simple model created.")
     elif args.model_type == 'transformer':
-        logging.error("Transformer model not yet implemented")
-        exit()
+        model = Transformer(dict_size=len(vocab),
+                              image_feature_dim=feature_dim,
+                              vocab=vocab,
+                              tf_ratio=tf_ratio)
+        logging.info("Transformer model created.")
     else:
         logging.error("Model type {} not understood".format(args.model_type))
     
